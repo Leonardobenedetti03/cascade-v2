@@ -22,6 +22,8 @@ paths:
   frame_baseline_ckpt: "{data}/checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth"
   frames_dir: "{run}/10_frames"
   traj_cache_dir: "{run}/traj_cache"
+  traj_dir: "{run}/01_traj"                                      # uscita dello stadio 01 (M08): un <take_name>.npz per take
+  pose_roots: []                                                 # TODO(HPC): radici con split_manifest.csv e annotations/ego_pose (v1: due)
 
 data:
   window_s: 8.0              # durata D della clip; ablation 4 / 16
@@ -29,8 +31,10 @@ data:
   window_stride_s: null      # passo tra finestre se n_windows > 1 (default = window_s); solo con center
   window_placement: center   # center (attorno al centro della take) | uniform (K parti uguali della take)
   duration_source: takes_json   # takes_json | video | trajectory
-  traj_source: aria_csv      # aria_csv (take intera, 1 kHz) | camformer_npz (segmenti rilasciati)
+  traj_source: aria_csv      # aria_csv (take intera, 1 kHz) | converted_npz (stadio 01) | camformer_npz (segmenti rilasciati)
   traj_fps: 20.0             # frequenza attesa da CamFormer (1 kHz / 50)
+  pose_src_fps: 30.0         # frequenza delle pose per frame di Ego-Exo4D (stadio 01)
+  pose_max_gap_frames: 15    # buchi sorgente più lunghi (a 30 Hz: 0,5 s): nessuna traiettoria (stadio 01)
   min_traj_coverage: 0.9     # frazione minima della finestra coperta dalla traiettoria
   vertical_axis: 2           # asse "su" del mondo Aria (gravità = -z). TODO(HPC)
   out_of_range: drop         # finestra oltre la fine del video: drop (scarta la clip) | clamp (ultimo frame)

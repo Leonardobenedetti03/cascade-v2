@@ -51,6 +51,17 @@ STAGE_KEYS: Dict[str, List[str]] = {
     ],
     "05_folds": ["paths.scenario_csv", "paths.split_sha256", "folds"],
     "10_frames": ["frames", "data.out_of_range"],
+    "01_traj": [
+        "paths.scenario_csv",
+        "paths.split_sha256",
+        "paths.pose_roots",
+        "paths.video_pattern",
+        "paths.video_glob",
+        "paths.traj_dir",
+        "data.traj_fps",
+        "data.pose_src_fps",
+        "data.pose_max_gap_frames",
+    ],
     "20_camformer": [
         "seed",
         "camformer.seed",

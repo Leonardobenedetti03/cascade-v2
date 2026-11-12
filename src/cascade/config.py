@@ -39,6 +39,8 @@ class PathsCfg:
     frame_baseline_ckpt: str = "{data}/checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth"
     frames_dir: str = "{run}/10_frames"
     traj_cache_dir: str = "{run}/traj_cache"
+    traj_dir: str = "{run}/01_traj"  # uscita dello stadio 01 (M08): un <take_name>.npz per take
+    pose_roots: List[str] = field(default_factory=list)  # radici del dataset con split_manifest.csv (stadio 01)
 
 
 @dataclass
@@ -48,8 +50,10 @@ class DataCfg:
     window_stride_s: Optional[float] = None
     window_placement: str = "center"  # center | uniform (K finestre su tutta la take)
     duration_source: str = "takes_json"  # takes_json | video | trajectory
-    traj_source: str = "aria_csv"  # aria_csv | camformer_npz
+    traj_source: str = "aria_csv"  # aria_csv | converted_npz | camformer_npz
     traj_fps: float = 20.0
+    pose_src_fps: float = 30.0  # frequenza delle pose per frame di Ego-Exo4D (stadio 01)
+    pose_max_gap_frames: int = 15  # buchi sorgente più lunghi: nessuna traiettoria (stadio 01)
     min_traj_coverage: float = 0.9
     vertical_axis: int = 2  # asse "su" nel mondo Aria (z)
     out_of_range: str = "drop"  # drop | clamp: finestra oltre video/traiettoria
@@ -403,7 +407,9 @@ def validate_config(cfg: Config) -> None:
     e: List[str] = []
     d, a, fr, fo, cam, ev, g = cfg.data, cfg.alignment, cfg.frames, cfg.folds, cfg.camformer, cfg.egovlp, cfg.gate
     _one_of(e, "data.duration_source", d.duration_source, ["takes_json", "video", "trajectory"])
-    _one_of(e, "data.traj_source", d.traj_source, ["aria_csv", "camformer_npz"])
+    _one_of(e, "data.traj_source", d.traj_source, ["aria_csv", "converted_npz", "camformer_npz"])
+    if d.pose_src_fps <= 0 or d.pose_max_gap_frames < 1:
+        e.append("data.pose_src_fps > 0 e data.pose_max_gap_frames >= 1")
     _one_of(e, "data.out_of_range", d.out_of_range, ["drop", "clamp"])
     _one_of(e, "data.short_take", d.short_take, ["keep", "drop"])
     _one_of(e, "data.vertical_axis", d.vertical_axis, [0, 1, 2])

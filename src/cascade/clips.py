@@ -310,7 +310,9 @@ def inspect_layout(ctx, max_entries: int = 12) -> str:
 
             lines.append(f"  {probe_video(video)}")
         lines.append(f"traiettoria attesa: {traj} (esiste: {traj.exists()})")
-        if traj.exists():
+        if traj.exists() and traj.suffix == ".npz":
+            lines.append(f"  npz di {traj.stat().st_size} byte")
+        elif traj.exists():
             with open(traj) as f:
                 lines.extend("  " + next(f).rstrip()[:300] for _ in range(3))
     return "\n".join(lines)
