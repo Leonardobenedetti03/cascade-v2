@@ -1,0 +1,11 @@
+# Ambiente conda equivalente a env/requirements.txt.
+#   conda env create -f env/environment.yml && conda activate dl4cv
+# torch non è fissato: installarlo dopo, con la build CUDA del cluster (HPC_CHECKLIST).
+name: dl4cv
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+      - -r requirements.txt

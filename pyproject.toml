@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cascade"
+version = "0.2.0"
+description = "DL4CV: cascata a costo variabile CamFormer -> TimeSformer-EgoVLP su Ego-Exo4D"
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-cov>=4", "hypothesis>=6", "ruff>=0.4", "black>=24", "pre-commit>=3"]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/cascade/models/vendor/*"]
+
+[tool.black]
+line-length = 120
+target-version = ["py39"]
+extend-exclude = "third_party|src/cascade/models/vendor"
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+extend-exclude = ["third_party", "src/cascade/models/vendor", "_synthetic_root"]
+
+[tool.ruff.lint]
+# pyflakes, pycodestyle, import ordinati, bugbear, pyupgrade (fermo a 3.9: niente "X | Y")
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+  "E501",   # righe lunghe: ci pensa black (stringhe e commenti possono superare)
+  "B905",   # zip(strict=) non esiste in 3.9
+  "B008",
+  "UP006", "UP007", "UP035", "UP045",  # typing.List/Optional restano: dataclass valutate a runtime su 3.9
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]     # sys.path prima degli import di src
+"tests/*.py" = ["E402", "B011"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
