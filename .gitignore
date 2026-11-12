@@ -1,0 +1,15 @@
+# log di SLURM nel clone (ancorato: NON ignora results/<run>/logs)
+/logs/
+# parametri personali del cluster
+hpc/env.local.sh
+# ambienti, cache, output pesanti
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+*.pt
+*.pth
+*.npy
+*.parquet
+.DS_Store
