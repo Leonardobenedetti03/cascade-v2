@@ -49,11 +49,9 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "alignment.video_start_key",
         "alignment.traj_start_key",
     ],
-    "03_keystep": ["task", "keystep", "data.window_s"],
     "05_folds": ["paths.scenario_csv", "folds"],
-    "10_frames": ["task", "frames", "data.out_of_range"],
+    "10_frames": ["frames", "data.out_of_range"],
     "20_camformer": [
-        "task",
         "seed",
         "camformer.seed",
         "data.traj_source",
@@ -65,7 +63,6 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "paths.camformer_ckpt",
     ],
     "25_egovlp": [
-        "task",
         "egovlp.arch",
         "egovlp.frame_indices",
         "egovlp.norm_mean",
@@ -74,18 +71,7 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "egovlp.zero_shot",
         "paths.egovlp_ckpt",
     ],
-    "26_egovlp_ft": [
-        "task",
-        "seed",
-        "egovlp.arch",
-        "egovlp.finetune",
-        "egovlp.norm_mean",
-        "egovlp.norm_std",
-        "egovlp.pretrained",
-        "paths.egovlp_ckpt",
-    ],
-    "22_camformer_prefix": ["streaming.prefixes", "streaming.recalibrate"],
-    "28_frame_baseline": ["task", "frame_baseline", "paths.frame_baseline_ckpt"],
+    "28_frame_baseline": ["frame_baseline", "paths.frame_baseline_ckpt"],
     "30_l1_heads": ["seed", "heads"],
     "35_fusion": ["fusion"],
     "40_cost": [
@@ -99,7 +85,6 @@ STAGE_KEYS: Dict[str, List[str]] = {
     ],
     "45_cache": ["data.vertical_axis", "data.max_missing_frac"],
     "50_gate": ["gate", "fusion.mode"],
-    "57_streaming": ["streaming", "gate.operating_budget", "gate.bootstrap", "gate.bootstrap_seed"],
 }
 
 

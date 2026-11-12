@@ -33,3 +33,32 @@ def test_bad_override_syntax():
 
 def test_deep_merge():
     assert deep_merge({"a": {"b": 1, "c": 2}}, {"a": {"c": 3}}) == {"a": {"b": 1, "c": 3}}
+
+
+def test_removed_sections_are_unknown():
+    """M12: streaming, keystep, task, bayes, level_minus1 e il fine-tuning di L1 non esistono più."""
+    for key in ("streaming", "task", "keystep"):
+        with pytest.raises(KeyError):
+            config_from_dict({key: {}})
+    with pytest.raises(KeyError):
+        config_from_dict({"gate": {"bayes": {}}})
+    with pytest.raises(KeyError):
+        config_from_dict({"gate": {"level_minus1": {}}})
+    with pytest.raises(KeyError):
+        config_from_dict({"egovlp": {"finetune": {}}})
+
+
+def test_site_folds_need_site_map():
+    with pytest.raises(ValueError):
+        config_from_dict({"folds": {"group_by": "site"}})
+    cfg = config_from_dict({"folds": {"group_by": "site", "site_map": "splits/site_v1/split.json"}})
+    assert cfg.folds.group_by == "site"
+    with pytest.raises(ValueError):
+        config_from_dict({"folds": {"group_by": "random"}})
+
+
+def test_new_sections_have_defaults():
+    cfg = load_config()
+    assert cfg.gate.compare.inner_cv == 3 and 1.0 in cfg.gate.compare.Cs
+    assert cfg.cost_e2e.n_clips == 200 and cfg.cost_e2e.passes == 2
+    assert cfg.folds.group_by == "take" and cfg.paths.split_sha256 is None

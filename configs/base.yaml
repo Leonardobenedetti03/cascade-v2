@@ -79,18 +79,6 @@ frame_baseline:
   w_grid_step: 0.1           # griglia delle fusioni con L½
   r_step: 5                  # griglia (r1, r2) della cascata a tre livelli
 
-# Variante causale (fase E3): CamFormer sui prefissi f · D della finestra (stadio 22, stessi
-# modelli dello stadio 20) e politica "fermati appena sei sicuro, altrimenti a fine finestra
-# decidi se scalare" (stadio 57): costo medio, latenza di decisione, accuratezza. Spenta di default.
-streaming:
-  enabled: false
-  prefixes: [0.25, 0.5, 0.75]   # frazioni della finestra; la finestra intera viene dalla cache (45)
-  recalibrate: true             # temperatura per prefisso sull'holdout della fold (come lo stadio 20)
-  tau_stop: [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]   # soglie di stop anticipato su max p del prefisso
-  gate: thr_maxprob             # score dell'escalation a fine finestra (o un gate dello stadio 50)
-  r_step: 5
-  within_pts: 1.0               # punto di lavoro: latenza minima entro 1 punto dalla cascata non causale
-
 heads:
   source: probe              # probe (backbone congelato + logistica) | finetune (stadio 26)
   Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
@@ -114,3 +102,10 @@ cost:
   counter: fvcore
   device: auto
   expected: {camformer: 0.02, timesformer_4f: 90.0}   # sanity check, ordine di grandezza
+
+# Costo end-to-end (stadio 41, M10): tempo per fase di L0 e L1, a batch 1.
+cost_e2e:
+  n_clips: 200    # campione stratificato per classe
+  n_warmup: 5     # clip di riscaldamento scartate
+  passes: 2       # si riporta la seconda passata; la prima si dichiara
+  seed: 0

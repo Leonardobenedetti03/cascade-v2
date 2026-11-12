@@ -28,7 +28,6 @@ camformer:
   train: {epochs: 15, batch_size: 32, patience: 4, lr: 3.0e-3, num_workers: 0}
 egovlp:
   num_workers: 0
-  finetune: {epochs: 3, batch_size: 8, amp: false, patience: 2, lr_backbone: 1.0e-4, lr_head: 3.0e-3}
   arch: {img_size: 32, patch_size: 16, embed_dim: 32, depth: 1, num_heads: 2, proj_dim: 16}
   pretrained: false
   batch_size: 32
@@ -38,8 +37,6 @@ frame_baseline:
   pretrained: false
   size: 32
   batch_size: 64
-streaming:
-  enabled: true
 heads:
   Cs: [0.1, 1.0]
 gate:

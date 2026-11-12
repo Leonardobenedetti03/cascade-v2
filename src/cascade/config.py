@@ -27,6 +27,7 @@ SYNTHETIC_FILE = "synthetic.yaml"
 @dataclass
 class PathsCfg:
     scenario_csv: str = "{repo}/third_party/seeing_without_pixels/data_files/egoexo4d/scenario_cls.csv"
+    split_sha256: Optional[str] = None  # SHA256 di scenario_csv: entra nei manifest (M07)
     takes_json: str = "{data}/egoexo4d/takes.json"
     takes_root: str = "{data}/egoexo4d/takes"
     video_pattern: str = "{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/aria01_214-1.mp4"
@@ -84,6 +85,8 @@ class FoldsCfg:
     n_folds: int = 5
     inner_holdout_frac: float = 0.1
     seed: int = 0
+    group_by: str = "take"  # take | site (M03)
+    site_map: Optional[str] = None  # sito -> fold: split.json versionato, non ricalcolato (D6)
 
 
 @dataclass
@@ -149,31 +152,9 @@ class ZeroShotCfg:
 
 
 @dataclass
-class EgovlpFinetuneCfg:
-    """Fine-tuning end-to-end di TimeSformer (fase D): opzione, mai di default."""
-
-    num_frames: int = 16
-    frame_indices: Optional[List[int]] = None  # None = tutti i frame estratti (16)
-    lr_backbone: float = 3e-5  # quello del fine-tuning di EgoVLP
-    lr_head: float = 1e-3
-    weight_decay: float = 0.01
-    epochs: int = 20
-    warmup_epochs: float = 1.0
-    batch_size: int = 4
-    grad_accum: int = 1
-    amp: bool = True
-    grad_checkpointing: bool = False
-    freeze_blocks: int = 0
-    label_smoothing: float = 0.0
-    augment: bool = True
-    patience: int = 3
-
-
-@dataclass
 class EgovlpCfg:
     arch: EgovlpArch = field(default_factory=EgovlpArch)
     zero_shot: ZeroShotCfg = field(default_factory=ZeroShotCfg)
-    finetune: EgovlpFinetuneCfg = field(default_factory=EgovlpFinetuneCfg)
     frame_indices: List[int] = field(default_factory=lambda: [2, 6, 9, 13])
     norm_mean: List[float] = field(default_factory=lambda: [0.485, 0.456, 0.406])
     norm_std: List[float] = field(default_factory=lambda: [0.229, 0.224, 0.225])
@@ -195,36 +176,6 @@ class FrameBaselineCfg:
     device: str = "auto"
     w_grid_step: float = 0.1  # griglia per le fusioni con L½ (stadio 45)
     r_step: int = 5  # griglia (r1, r2) della cascata a tre livelli
-
-
-@dataclass
-class TaskCfg:
-    """Task di classificazione: scenario (principale) o keystep (secondario, fase E4)."""
-
-    name: str = "scenario"  # scenario | keystep
-    labels: str = "{repo}/configs/labels.yaml"  # classi del task (00 e 05 usano sempre gli scenari)
-
-
-@dataclass
-class KeystepCfg:
-    """Task keystep (fase E4): solo struttura. TODO(HPC): segmenti e classi dalle annotazioni."""
-
-    segments_csv: str = "{data}/keystep/segments.csv"  # CSV normalizzato, vedi src/cascade/keystep.py
-    window: str = "center"  # center (finestra D centrata nel segmento) | segment (finestra = segmento)
-    min_segment_s: float = 1.0
-
-
-@dataclass
-class StreamingCfg:
-    """Variante causale (fase E3): L0 su prefissi crescenti della finestra (stadi 22 e 57)."""
-
-    enabled: bool = False
-    prefixes: List[float] = field(default_factory=lambda: [0.25, 0.5, 0.75])  # frazioni di D; 1 = cache
-    recalibrate: bool = True  # temperatura per prefisso sull'holdout della fold
-    tau_stop: List[float] = field(default_factory=lambda: [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99])
-    gate: str = "thr_maxprob"  # score dell'escalation a fine finestra: thr_maxprob o un gate dello stadio 50
-    r_step: int = 5
-    within_pts: float = 1.0  # punto di lavoro: latenza minima entro questi punti di accuratezza
 
 
 @dataclass
@@ -255,23 +206,11 @@ class CostCfg:
 
 
 @dataclass
-class LevelMinus1Cfg:
-    enabled: bool = False
-    feature: str = "mot_energy"
-    threshold_quantile: float = 0.05
-    action: str = "escalate"  # escalate | accept
+class CompareCfg:
+    """CompareConfidence (M06): regressione logistica che stima P(L1 ha ragione | z)."""
 
-
-@dataclass
-class BayesCfg:
-    inference: str = "svi"  # svi | nuts
-    steps: int = 2000  # SVI
-    lr: float = 0.01
-    num_samples: int = 300
-    num_warmup: int = 300  # NUTS
-    prior_scale: float = 1.0  # deviazione standard del prior su β
-    score: str = "mean"  # mean | quantile (score "pessimistico")
-    quantile: float = 0.9
+    Cs: List[float] = field(default_factory=lambda: [0.001, 0.01, 0.1, 1.0, 10.0])
+    inner_cv: int = 3
 
 
 @dataclass
@@ -281,7 +220,6 @@ class GateCfg:
     beta_n0: float = 20.0  # pseudo-osservazioni del prior Beta
     beta_q: float = 0.1  # quantile della posterior (10° percentile)
     prior_confusion: Optional[str] = "{repo}/configs/priors/camformer_confusion.csv"
-    bayes: BayesCfg = field(default_factory=BayesCfg)
     emb_pca_dim: int = 16
     models: List[str] = field(default_factory=list)
     logreg_Cs: List[float] = field(default_factory=lambda: [0.01, 0.1, 1.0, 10.0])
@@ -299,7 +237,17 @@ class GateCfg:
     bootstrap_seed: int = 0
     comparisons: List[List[str]] = field(default_factory=list)  # coppie [A, B] per A − B (RQ2)
     reference: List[str] = field(default_factory=list)  # gate per la cascata per classe
-    level_minus1: LevelMinus1Cfg = field(default_factory=LevelMinus1Cfg)
+    compare: CompareCfg = field(default_factory=CompareCfg)
+
+
+@dataclass
+class CostE2ECfg:
+    """Costo end-to-end (stadio 41, M10): tempo per fase di L0 e L1, a batch 1."""
+
+    n_clips: int = 200  # campione stratificato per classe
+    n_warmup: int = 5  # clip di riscaldamento scartate
+    passes: int = 2  # si riporta la seconda passata (file in cache), la prima si dichiara
+    seed: int = 0
 
 
 @dataclass
@@ -328,12 +276,10 @@ class Config:
     camformer: CamformerCfg = field(default_factory=CamformerCfg)
     egovlp: EgovlpCfg = field(default_factory=EgovlpCfg)
     frame_baseline: FrameBaselineCfg = field(default_factory=FrameBaselineCfg)
-    streaming: StreamingCfg = field(default_factory=StreamingCfg)
-    task: TaskCfg = field(default_factory=TaskCfg)
-    keystep: KeystepCfg = field(default_factory=KeystepCfg)
     heads: HeadsCfg = field(default_factory=HeadsCfg)
     fusion: FusionCfg = field(default_factory=FusionCfg)
     cost: CostCfg = field(default_factory=CostCfg)
+    cost_e2e: CostE2ECfg = field(default_factory=CostE2ECfg)
     gate: GateCfg = field(default_factory=GateCfg)
     synthetic: SyntheticCfg = field(default_factory=SyntheticCfg)
 
@@ -477,6 +423,9 @@ def validate_config(cfg: Config) -> None:
         e.append("frames: size <= crop <= pre_resize e n_frames >= 1")
     if fo.n_folds < 2 or not 0 < fo.inner_holdout_frac < 0.5:
         e.append("folds.n_folds >= 2 e folds.inner_holdout_frac in (0, 0.5)")
+    _one_of(e, "folds.group_by", fo.group_by, ["take", "site"])
+    if fo.group_by == "site" and not fo.site_map:
+        e.append("folds.site_map è obbligatorio con folds.group_by=site")
     _one_of(e, "camformer.arch.pose_encoding", cam.arch.pose_encoding, ["abs7d", "rel9d", "rel9d_grav"])
     _one_of(e, "camformer.eval_source", cam.eval_source, ["fold_ensemble", "full"])
     _one_of(e, "camformer.train.monitor", cam.train.monitor, ["val_loss", "val_acc"])
@@ -497,40 +446,25 @@ def validate_config(cfg: Config) -> None:
     if not 0 <= fb.frame_index < fr.n_frames or fb.size < 16 or not 1 <= fb.r_step <= 100:
         e.append("frame_baseline: frame_index in [0, n_frames), size >= 16, r_step in [1, 100]")
     _one_of(e, "fusion.mode", cfg.fusion.mode, ["fuse", "replace", "learned"])
-    _one_of(e, "heads.source", cfg.heads.source, ["probe", "finetune"])
-    ft = ev.finetune
-    if ft.frame_indices is not None and (
-        len(ft.frame_indices) != ft.num_frames or any(i < 0 or i >= fr.n_frames for i in ft.frame_indices)
-    ):
-        e.append("egovlp.finetune.frame_indices: num_frames indici in [0, frames.n_frames)")
-    if ft.frame_indices is None and ft.num_frames != fr.n_frames:
-        e.append("egovlp.finetune.num_frames != frames.n_frames: specificare finetune.frame_indices")
+    _one_of(e, "heads.source", cfg.heads.source, ["probe"])  # il fine-tuning di L1 non si porta (M12)
     if not 0 < cfg.fusion.w_grid_step <= 1:
         e.append("fusion.w_grid_step in (0, 1]")
     _one_of(e, "cost.counter", cfg.cost.counter, ["fvcore", "torch", "analytic"])
     _one_of(e, "gate.reliability", g.reliability, ["empirical", "beta"])
     _one_of(e, "gate.logreg_class_weight", g.logreg_class_weight, ["balanced", "none"])
-    _one_of(e, "gate.bayes.inference", g.bayes.inference, ["svi", "nuts"])
-    _one_of(e, "gate.bayes.score", g.bayes.score, ["mean", "quantile"])
-    if g.beta_n0 <= 0 or not 0 < g.beta_q < 1 or not 0 < g.bayes.quantile < 1:
-        e.append("gate.beta_n0 > 0, gate.beta_q e gate.bayes.quantile in (0, 1)")
-    _one_of(e, "gate.level_minus1.action", g.level_minus1.action, ["escalate", "accept"])
+    if g.beta_n0 <= 0 or not 0 < g.beta_q < 1:
+        e.append("gate.beta_n0 > 0 e gate.beta_q in (0, 1)")
     if not all(0 < b <= 1 for b in g.budgets) or not 0 < g.operating_budget <= 1:
         e.append("gate.budgets e gate.operating_budget in (0, 1]")
     if not 1 <= g.r_step <= 100:
         e.append("gate.r_step in [1, 100]")
     if any(len(p) != 2 for p in g.comparisons):
         e.append("gate.comparisons: coppie [A, B]")
-    _one_of(e, "task.name", cfg.task.name, ["scenario", "keystep"])
-    _one_of(e, "keystep.window", cfg.keystep.window, ["center", "segment"])
-    if cfg.keystep.min_segment_s <= 0:
-        e.append("keystep.min_segment_s > 0")
-    st = cfg.streaming
-    pf = list(st.prefixes)
-    if not pf or pf != sorted(set(pf)) or not all(0 < f <= 1 for f in pf):
-        e.append("streaming.prefixes: frazioni crescenti e distinte in (0, 1]")
-    if not all(0 < t <= 1 for t in st.tau_stop) or not 1 <= st.r_step <= 100 or st.within_pts < 0:
-        e.append("streaming: tau_stop in (0, 1], r_step in [1, 100], within_pts >= 0")
+    if not g.compare.Cs or g.compare.inner_cv < 2:
+        e.append("gate.compare.Cs non vuoto e gate.compare.inner_cv >= 2")
+    ce = cfg.cost_e2e
+    if ce.n_clips < 1 or ce.n_warmup < 0 or ce.passes < 1:
+        e.append("cost_e2e: n_clips >= 1, n_warmup >= 0, passes >= 1")
     if e:
         raise ValueError("config non valida:\n  - " + "\n  - ".join(e))
 

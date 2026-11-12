@@ -96,15 +96,14 @@ class StageContext:
 
     @property
     def l1_tag(self) -> str:
-        """Sorgente di L1: ``probe`` (25 + logistica) o ``finetune`` (stadio 26)."""
+        """Sorgente di L1: sempre ``probe`` (25 + logistica); il fine-tuning non si porta (M12)."""
         return self.cfg.heads.source
 
     @property
     def variant_tag(self) -> str:
-        """Identità di una cascata: variante di L0, ``_l1ft`` se L1 viene dal fine-tuning,
-        ``_flearn`` con la fusione appresa. Identifica gli output di 35, 45 e 50."""
-        tag = self.cam_tag + ("" if self.l1_tag == "probe" else "_l1ft")
-        return tag + ("_flearn" if self.cfg.fusion.mode == "learned" else "")
+        """Identità di una cascata: variante di L0, più ``_flearn`` con la fusione appresa
+        (si toglie in C09). Identifica gli output di 35, 45 e 50."""
+        return self.cam_tag + ("_flearn" if self.cfg.fusion.mode == "learned" else "")
 
     def seed_dir(self, stage: str) -> Path:
         """Cartella della variante di L0 (stadio 20)."""
@@ -119,18 +118,14 @@ class StageContext:
 
     @property
     def clips_path(self) -> Path:
-        """Tabella delle clip del task: ``data/clips.csv`` (scenario, stadio 00) o
-        ``data/clips_keystep.csv`` (keystep, stadio 03)."""
-        name = "clips.csv" if self.cfg.task.name == "scenario" else f"clips_{self.cfg.task.name}.csv"
-        return self.run_dir / "data" / name
+        """Tabella delle clip (scenario): ``data/clips.csv``, scritta dallo stadio 00."""
+        return self.run_dir / "data" / "clips.csv"
 
     def read_clips(self):
         """Clip del task, dopo aver verificato lo stadio che le produce."""
         import pandas as pd
 
         self.require("00_inventory")
-        if self.cfg.task.name == "keystep":
-            self.require("03_keystep")
         return pd.read_csv(self.clips_path)
 
     def done(self, outputs: Iterable[Path], part: Optional[str] = None) -> bool:
@@ -186,7 +181,7 @@ def open_stage(args: argparse.Namespace, name: str, *, make_stage_dir: bool = Tr
         stage_dir.mkdir(parents=True, exist_ok=True)
     data_root = rdir / "synthetic_data" if args.synthetic else paths.data_root()
     scenario_labels = load_labels()
-    labels = load_labels(paths.resolve(cfg.task.labels, data=data_root, run=rdir))
+    labels = scenario_labels  # nella v2 il task è sempre lo scenario (M12)
     set_seed(cfg.seed)
     dump_config(cfg, rdir / "configs" / f"{name}{suffix}.yaml")
     commit = git_commit()

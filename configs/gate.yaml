@@ -7,15 +7,6 @@ gate:
   beta_n0: 20                    # pseudo-osservazioni del prior
   beta_q: 0.1                    # 10° percentile della posterior come feature in più
   prior_confusion: "{repo}/configs/priors/camformer_confusion.csv"
-  bayes:                         # gate bayes_logreg_<gruppi> (NumPyro, opzionale)
-    inference: svi               # svi (veloce su CPU) | nuts
-    steps: 2000
-    lr: 0.01
-    num_samples: 300
-    num_warmup: 300
-    prior_scale: 1.0
-    score: mean                  # mean | quantile (pessimistico)
-    quantile: 0.9
   emb_pca_dim: 16
   models: [always_L0, always_L1, random, thr_maxprob, thr_entropy, thr_margin,
            logreg_A, logreg_AB, logreg_ABC, logreg_ABC+emb, lgbm_ABC, ridge_ABC, oracle]
@@ -54,8 +45,5 @@ gate:
   operating_budget: 0.5          # punto di lavoro scelto su val
   bootstrap: 1000
   bootstrap_seed: 0
-  level_minus1:                  # regola fissa prima del gate (ablation)
-    enabled: false
-    feature: mot_energy
-    threshold_quantile: 0.05     # quantile stimato sul train
-    action: escalate             # escalate | accept
+  # CompareConfidence (M06): P(c1 = 1 | z) con regressione logistica, senza pesi di classe
+  compare: {Cs: [0.001, 0.01, 0.1, 1.0, 10.0], inner_cv: 3}
