@@ -3,6 +3,7 @@
 run_name: synthetic
 paths:
   scenario_csv: "{data}/scenario_cls.csv"
+  split_sha256: null
   takes_json: "{data}/takes.json"
   takes_root: "{data}/takes"
   video_pattern: "{takes_root}/{take_name}/aria01_214-1.mp4"
@@ -22,6 +23,7 @@ frames:
   size: 32
 folds:
   n_folds: 5
+  group_by: take
 camformer:
   arch: {d_model: 32, nhead: 2, num_layers: 1, dim_feedforward: 64, output_dim: 32}
   pretrained: false

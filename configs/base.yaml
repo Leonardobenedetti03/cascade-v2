@@ -7,7 +7,8 @@ run_name: mvp_D8
 seed: 0
 
 paths:
-  scenario_csv: "{repo}/third_party/seeing_without_pixels/data_files/egoexo4d/scenario_cls.csv"
+  scenario_csv: "{repo}/splits/site_v1/scenario_site.csv"
+  split_sha256: "c9f4e3083f57b099ef9693a5fa57b2f8666bddb6f4377834a7d015e2c7e0344d"  # SHA256 di scenario_csv: entra nei manifest (M07)
   takes_json: "{data}/egoexo4d/takes.json"                       # TODO(HPC)
   takes_root: "{data}/egoexo4d/takes"                            # TODO(HPC)
   # Stream RGB degli occhiali Aria, versione 448 px. TODO(HPC): verificare il nome.
@@ -35,7 +36,7 @@ data:
   out_of_range: drop         # finestra oltre la fine del video: drop (scarta la clip) | clamp (ultimo frame)
   short_take: keep           # take più corta di window_s: keep (finestra = take intera) | drop
   max_missing_frac: 0.02     # clip perse tra uno stadio e l'altro oltre cui fermarsi (fail fast)
-  expected_split_counts: {train: 3049, val: 836, test: 1109}   # solo sanity check
+  expected_split_counts: {train: 1138, val: 68, test: 67}
 
 alignment:
   # same_origin: t=0 della traiettoria coincide con t=0 del video (+ offset_s).
@@ -64,6 +65,8 @@ folds:
   n_folds: 5
   inner_holdout_frac: 0.1
   seed: 0
+  group_by: site             # take | site (M03)
+  site_map: "{repo}/splits/site_v1/split.json"   # sito -> fold: dato versionato, non ricalcolato (D6)
 
 # Baseline "un frame" L½ (B1): MobileNetV3-Small congelato su 1 frame a 112 px + testa
 # lineare per fold (stadio 28), e cascata a tre livelli CamFormer → 1 frame → TimeSformer
