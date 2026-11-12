@@ -49,7 +49,7 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "alignment.video_start_key",
         "alignment.traj_start_key",
     ],
-    "05_folds": ["paths.scenario_csv", "folds"],
+    "05_folds": ["paths.scenario_csv", "paths.split_sha256", "folds"],
     "10_frames": ["frames", "data.out_of_range"],
     "20_camformer": [
         "seed",
@@ -86,6 +86,13 @@ STAGE_KEYS: Dict[str, List[str]] = {
     "45_cache": ["data.vertical_axis", "data.max_missing_frac"],
     "50_gate": ["gate", "fusion.mode"],
 }
+
+# [M07] Un cambio di split o di fold deve invalidare tutto ciò che ne dipende. Senza queste chiavi
+# is_done() considera "già fatto" uno stadio a valle calcolato con fold vecchie e lo salta.
+SPLIT_KEYS = ["paths.scenario_csv", "paths.split_sha256", "folds"]
+SPLIT_DEPENDENT_STAGES = ("20_camformer", "28_frame_baseline", "30_l1_heads", "35_fusion", "45_cache", "50_gate")
+for _stage in SPLIT_DEPENDENT_STAGES:
+    STAGE_KEYS[_stage] = STAGE_KEYS[_stage] + [k for k in SPLIT_KEYS if k not in STAGE_KEYS[_stage]]
 
 
 class ConfigMismatch(RuntimeError):
