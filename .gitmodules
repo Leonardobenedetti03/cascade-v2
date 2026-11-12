@@ -1,0 +1,6 @@
+[submodule "third_party/seeing_without_pixels"]
+	path = third_party/seeing_without_pixels
+	url = https://github.com/google-deepmind/seeing_without_pixels
+[submodule "third_party/EgoVLP"]
+	path = third_party/EgoVLP
+	url = https://github.com/showlab/EgoVLP
