@@ -1,0 +1,54 @@
+# Override per --synthetic: dati finti generati sotto {run}/synthetic_data, modelli
+# piccoli a pesi casuali, tutto su CPU in pochi minuti.
+run_name: synthetic
+paths:
+  scenario_csv: "{data}/scenario_cls.csv"
+  takes_json: "{data}/takes.json"
+  takes_root: "{data}/takes"
+  video_pattern: "{takes_root}/{take_name}/aria01_214-1.mp4"
+  video_glob: "{takes_root}/{take_name}/*214-1*.mp4"
+  traj_pattern: "{takes_root}/{take_name}/closed_loop_trajectory.csv"
+  camformer_ckpt: "{data}/checkpoints/missing.pt"
+  egovlp_ckpt: "{data}/checkpoints/missing.pth"
+data:
+  window_s: 4.0
+  expected_split_counts: null   # niente sanity check sui conteggi reali
+alignment:
+  mode: device_us
+frames:
+  n_frames: 16
+  pre_resize: 36
+  crop: 36
+  size: 32
+folds:
+  n_folds: 5
+camformer:
+  arch: {d_model: 32, nhead: 2, num_layers: 1, dim_feedforward: 64, output_dim: 32}
+  pretrained: false
+  train: {epochs: 15, batch_size: 32, patience: 4, lr: 3.0e-3, num_workers: 0}
+egovlp:
+  num_workers: 0
+  finetune: {epochs: 3, batch_size: 8, amp: false, patience: 2, lr_backbone: 1.0e-4, lr_head: 3.0e-3}
+  arch: {img_size: 32, patch_size: 16, embed_dim: 32, depth: 1, num_heads: 2, proj_dim: 16}
+  pretrained: false
+  batch_size: 32
+  zero_shot: {text_model: hashing}
+frame_baseline:
+  enabled: true
+  pretrained: false
+  size: 32
+  batch_size: 64
+streaming:
+  enabled: true
+heads:
+  Cs: [0.1, 1.0]
+gate:
+  bootstrap: 100
+  random_seeds: 3
+  seeds: [0, 1]
+cost:
+  # i modelli sintetici sono minuscoli: si usano i costi delle architetture reali (misurati)
+  override_gmacs: {L0: 0.1216, L1: 92.31, Lhalf: 0.0153}
+  timesformer_frames: [4]
+  latency_reps: 2
+  expected: null

@@ -1,0 +1,6 @@
+# Classi del task keystep (fase E4), nel formato di configs/labels.yaml.
+# TODO(HPC): elenco dalle annotazioni keystep di Ego-Exo4D, non verificabile qui (nessun
+# submodule le usa). Una riga per classe, kind: procedural (sono passi di procedure):
+#   - {name: <nome del keystep>, csv_task: <nome del keystep>, kind: procedural}
+# Lo stadio 03 si ferma con un errore finché ci sono meno di 2 classi.
+classes: []

@@ -1,0 +1,61 @@
+# Gate e valutazione (sezione 6). Feature solo da L0 e dalla traiettoria.
+gate:
+  reliability: empirical         # empirical | beta (Beta-Binomiale, src/cascade/gate/bayes.py)
+  reliability_alpha: 1.0         # smoothing di Laplace della precisione per classe (empirical)
+  # Beta-Binomiale: prior dalla confusione del paper CamFormer (classi equiprobabili) se il file
+  # esiste (TODO: compilarlo dalla figura del paper), altrimenti l'accuratezza del paper (71,3%).
+  beta_n0: 20                    # pseudo-osservazioni del prior
+  beta_q: 0.1                    # 10° percentile della posterior come feature in più
+  prior_confusion: "{repo}/configs/priors/camformer_confusion.csv"
+  bayes:                         # gate bayes_logreg_<gruppi> (NumPyro, opzionale)
+    inference: svi               # svi (veloce su CPU) | nuts
+    steps: 2000
+    lr: 0.01
+    num_samples: 300
+    num_warmup: 300
+    prior_scale: 1.0
+    score: mean                  # mean | quantile (pessimistico)
+    quantile: 0.9
+  emb_pca_dim: 16
+  models: [always_L0, always_L1, random, thr_maxprob, thr_entropy, thr_margin,
+           logreg_A, logreg_AB, logreg_ABC, logreg_ABC+emb, lgbm_ABC, ridge_ABC, oracle]
+  # RQ2: il gate che usa la traiettoria (moto, embedding) predice quando servono i pixel
+  # meglio della sola confidenza di CamFormer, a parità di costo? Differenze A − B appaiate
+  # (stessi ricampionamenti per take) su area, accuratezza a budget e quota dell'oracolo.
+  comparisons:
+    - [logreg_ABC, logreg_A]
+    - [logreg_ABC+emb, logreg_A]
+    - [lgbm_ABC, logreg_A]
+    - [logreg_ABC, thr_maxprob]
+    - [logreg_AB, logreg_A]
+    - [ridge_ABC, logreg_ABC]      # etichetta soft vs etichetta rara (B6)
+  reference: []                  # gate per la cascata nelle tabelle per classe (vuoto = migliore su val)
+  logreg_Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
+  logreg_inner_cv: 3
+  logreg_class_weight: balanced  # y = 1 è raro: pesi bilanciati (ablation: configs/ablations/gate_weights.yaml)
+  ridge_alphas: [0.1, 1.0, 10.0, 100.0]   # ridge_* sull'etichetta soft (B6)
+  lgbm:
+    num_leaves: 15
+    min_child_samples: 20        # = min_data_in_leaf
+    learning_rate: 0.05
+    n_estimators: 500
+    subsample: 0.8
+    subsample_freq: 1
+    colsample_bytree: 0.8
+    early_stopping_rounds: 30
+    valid_frac: 0.2
+    deterministic: true          # risultati identici a parità di seed (e di thread)
+    force_row_wise: true
+  random_seeds: 10               # seed mediati per il gate random
+  seeds: [0, 1, 2]               # seed per i gate stocastici (lgbm)
+  r_step: 1                      # quota di escalation r in %, da 0 a 100
+  budgets: [0.25, 0.5]           # frazioni del costo di always_L1
+  within_pts: 0.01               # "entro 1 punto da always_L1"
+  operating_budget: 0.5          # punto di lavoro scelto su val
+  bootstrap: 1000
+  bootstrap_seed: 0
+  level_minus1:                  # regola fissa prima del gate (ablation)
+    enabled: false
+    feature: mot_energy
+    threshold_quantile: 0.05     # quantile stimato sul train
+    action: escalate             # escalate | accept

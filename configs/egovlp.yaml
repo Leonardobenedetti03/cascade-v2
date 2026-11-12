@@ -1,0 +1,52 @@
+# L1: TimeSformer con pesi EgoVLP (third_party/EgoVLP), backbone congelato.
+egovlp:
+  arch:
+    img_size: 224
+    patch_size: 16
+    embed_dim: 768
+    depth: 12
+    num_heads: 12
+    num_frames: 4
+    proj_dim: 256
+  # 4 dei 16 frame estratti (simmetrici attorno al centro della finestra).
+  frame_indices: [2, 6, 9, 13]
+  norm_mean: [0.485, 0.456, 0.406]
+  norm_std: [0.229, 0.224, 0.225]
+  pretrained: true
+  batch_size: 16
+  num_workers: 4
+  pin_memory: true
+  device: auto
+  # Fine-tuning end-to-end (fase D, stadio 26): opzione, mai di default. Si usa con
+  # --set heads.source=finetune sugli stadi 30–50. Default dalle config di fine-tuning di
+  # EgoVLP (configs/ft/charades.json): 16 frame, lr 3e-5, batch 4, temporal_embed esteso con zeri.
+  finetune:
+    num_frames: 16
+    frame_indices: null          # null = tutti i 16 frame estratti
+    lr_backbone: 3.0e-5
+    lr_head: 1.0e-3
+    weight_decay: 0.01
+    epochs: 20
+    warmup_epochs: 1.0
+    batch_size: 4
+    grad_accum: 1
+    amp: true                    # fp16 su CUDA
+    grad_checkpointing: false
+    freeze_blocks: 0
+    label_smoothing: 0.0
+    augment: true                # RandomResizedCrop (0,5–1) + flip, come il train di EgoVLP
+    patience: 3
+  zero_shot:
+    enabled: true
+    text_model: distilbert-base-uncased
+    temperature: 0.05
+    # Prompt in stile narrazione Ego4D, chiavi = name di labels.yaml.
+    prompts:
+      Basketball: "#C C plays basketball on a court"
+      Dance: "#C C dances"
+      Music: "#C C plays a musical instrument"
+      Soccer: "#C C plays soccer on a field"
+      Cooking: "#C C cooks food in a kitchen"
+      Bouldering: "#C C climbs a bouldering wall"
+      Health: "#C C performs a medical test"
+      Bike repair: "#C C repairs a bicycle"

@@ -1,0 +1,14 @@
+# Ordine canonico delle classi: indice = posizione nella lista.
+# È l'ordine di CamFormer (datasets/egoexo4d_pretrain.py::name2label e
+# tasks/pretrain_longseq.py::class_names), quindi coincide con un'eventuale testa
+# cls_model nel checkpoint. NON è l'ordine della colonna `label` di
+# scenario_cls.csv: la mappatura dal CSV avviene sempre per nome (`csv_task`).
+classes:
+  - {name: Basketball,  csv_task: Basketball,    kind: physical}
+  - {name: Dance,       csv_task: Dance,         kind: physical}
+  - {name: Music,       csv_task: Music,         kind: physical}
+  - {name: Soccer,      csv_task: Soccer,        kind: physical}
+  - {name: Cooking,     csv_task: Cooking,       kind: procedural}
+  - {name: Bouldering,  csv_task: Rock Climbing, kind: physical}
+  - {name: Health,      csv_task: Health,        kind: procedural}
+  - {name: Bike repair, csv_task: Bike Repair,   kind: procedural}
