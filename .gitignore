@@ -13,3 +13,6 @@ __pycache__/
 *.npy
 *.parquet
 .DS_Store
+
+# run sintetica locale
+_synthetic_root/
