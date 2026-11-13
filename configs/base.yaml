@@ -20,7 +20,7 @@ paths:
   egovlp_ckpt: "{data}/checkpoints/egovlp/egovlp.pth"            # EgoVLP_PT_BEST
   # pesi torchvision IMAGENET1K_V1 di mobilenet_v3_small (baseline un frame). TODO(HPC)
   frame_baseline_ckpt: "{data}/checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth"
-  frames_dir: "{run}/10_frames"
+  frames_dir: "{data}/frames/{run_name}"                         # persistente, fuori dalla run (era {run}/10_frames)
   traj_cache_dir: "{run}/traj_cache"
   traj_dir: "{run}/01_traj"                                      # uscita dello stadio 01 (M08): un <take_name>.npz per take
   pose_roots: []                                                 # TODO(HPC): radici con split_manifest.csv e annotations/ego_pose (v1: due)

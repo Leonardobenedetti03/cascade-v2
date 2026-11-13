@@ -15,7 +15,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M05 | Fusione `replace` di default | Fusione log-lineare | Δ = 0,0 nella v1; gli ensemble non migliorano il fronte; L1 diventa l'esperto | previsto C09 |
 | M06 | Gate per famiglie, CompareConfidence | Più di 15 gate senza riferimento | RQ2 tra famiglie citabili; la traiettoria è l'unica variabile tra `compare_A` e `compare_AC` | previsto C11 |
 | M07 | Manifest con chiavi di split e fold | Cambio di fold non rilevato a valle | Impedisce di riusare in silenzio output calcolati con fold diverse | 1d8dd17 (C05) |
-| M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | fe15eb0 (C07a), C07b |
+| M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | fe15eb0 (C07a), 31714af (C07b) |
 | M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | previsto C12 |
 | M10 | Costo end-to-end e sensibilità al costo delle pose | Solo GMACs e latenza dei modelli | I GMACs non misurano decodifica e camera | previsto C10 |
 | M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | previsto C13 |
@@ -75,3 +75,19 @@ partizione `stud` e QOS `stud` per CPU e GPU; GPU richiesta con `--gpus=1` (la v
 `sbatch --test-only` quale forma accetta il cluster); `module load miniconda3`; dati in `~/cascade_data`
 (`DL4CV_ROOT` e `CASCADE_DATA_ROOT`), run in `~/cascade_runs` (`CASCADE_RUN_ROOT`). La v1 ricreava il venv in `/tmp`
 a ogni job: la v2 usa un ambiente persistente (M11).
+
+**N8 — Ripresa per epoca (D7).** `finetune.train_fold` salva `ckpt_last.pt` a fine epoca (scrittura atomica) con
+modello, ottimizzatore, stato migliore, contatore della patience e storia. La chiave è l'hash delle chiavi di config
+dello stadio 20 più fold e seed: un checkpoint di un'altra config, o non leggibile, si ignora. Lo stadio lo cancella
+dopo aver scritto il manifest, e una fold già fermata dall'early stopping non viene prolungata. Limite: lo stato dei
+generatori casuali (dropout) non si salva, quindi una ripresa non riproduce bit per bit un addestramento mai interrotto.
+
+**N9 — fusion.py e heads.py anticipati.** `calibration.py` importa `log_softmax` da `fusion.py`, e `fusion.py`
+importa `heads.py` (riga 78): i tre file si portano identici già in C08a come dipendenze. `heads.py` arriva con il suo
+test (`test_heads`); il test di `fusion.py` e le modifiche di M05 restano in C09.
+
+**N10 — Frame persistenti e CamFormer da zero.** `paths.frames_dir` diventa `{data}/frames/{run_name}` (era
+`{run}/10_frames`); `ctx.path` passa `run_name` (valore di default, sovrascrivibile). M04 e M15 applicati in
+`configs/camformer.yaml`: `pretrained: false`, 50 epoche, patience 8; i default delle dataclass non cambiano.
+`TrajectoryWindowDataset.prefix_frac` e `role_datasets(prefix_frac, roles)` restano come nella v1 (servivano alla
+variante causale, tolta in M12): da togliere in un commit di pulizia.

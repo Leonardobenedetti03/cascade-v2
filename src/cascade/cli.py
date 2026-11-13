@@ -75,6 +75,7 @@ class StageContext:
     scenario_labels: Optional[Labels] = None  # gli 8 scenari: inventario (00) e fold (05)
 
     def path(self, template: str, **fields: object) -> Path:
+        fields.setdefault("run_name", self.run_dir.name)  # {run_name}: frames_dir persistente
         return paths.resolve(template, data=self.data_root, run=self.run_dir, **fields)
 
     @property

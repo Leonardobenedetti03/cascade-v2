@@ -28,7 +28,11 @@ step() { echo "== $*"; "$PY" "scripts/$1" "${COMMON[@]}" "${@:2}"; }
 step 01_convert_trajectories.py
 step 00_inventory.py
 step 05_folds.py
-# C07: 01_convert_trajectories.py   C08: 10, 15, 20, 25, 28, 30
+step 10_extract_frames.py --num-shards 2 --shard-id 0
+step 10_extract_frames.py --num-shards 2 --shard-id 1
+# shellcheck disable=SC2086
+for f in $FOLDS; do step 20_camformer_finetune.py --fold "$f"; done
+# C08b: 15, 25, 28, 30
 # C09: 35   C10: 40, 41   C12: 27, 45, 50 --final, 52   C13: 55
 
 RUN_DIR=$("$PY" -c "from src.cascade.paths import run_dir; print(run_dir('$RUN_NAME'))")

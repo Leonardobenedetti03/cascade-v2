@@ -11,7 +11,7 @@ camformer:
   # Contesto in ingresso al transformer; il mean-pool si fa solo sulla finestra centrale.
   # null = uguale a data.window_s. TODO(HPC): quale contesto riproduce ~71%?
   context_s: null
-  pretrained: true
+  pretrained: false              # M04: il checkpoint pubblico ha visto train e val
   init_head_from_ckpt: false     # usa cls_model del checkpoint se presente (stesso ordine classi)
   eval_source: fold_ensemble     # val/test: media dei 5 modelli di fold | full
   mc_dropout_passes: 0           # >0 abilita le colonne MC dropout
@@ -23,9 +23,9 @@ camformer:
     lr: 1.0e-4
     weight_decay: 1.0e-3
     head_lr_mult: 10.0
-    epochs: 30
+    epochs: 50                   # M15 (D3)
     batch_size: 64
-    patience: 5
+    patience: 8                  # M15 (D3)
     monitor: val_loss            # val_loss | val_acc (sull'holdout interno)
     temporal_jitter_s: 0.0
     num_workers: 4
