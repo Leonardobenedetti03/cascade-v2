@@ -17,8 +17,8 @@ sub() {   # sub <etichetta> <argomenti di submit.sh>: stampa il job id, annota i
 }
 
 # A - dati (CPU)
-j00=$(sub A   00)
-j01=$(sub A   01 --after "$j00")
+j01=$(sub A 01)  # la conversione delle pose non dipende da nulla: l'inventario (00) la aspetta
+j00=$(sub A 00 --after "$j01")
 j05=$(sub A   05 --after "$j00")
 # B - frame (array CPU), feature di L1 (GPU), diagnostica dell'allineamento
 j10=$(sub B10 10 --after "$j00")

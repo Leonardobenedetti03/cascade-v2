@@ -47,6 +47,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     scenario_csv = paths.resolve(ctx.cfg.paths.scenario_csv, data=ctx.data_root, run=ctx.run_dir)
     split_sha = check_split_hash(scenario_csv, ctx.cfg.paths.split_sha256)  # ValueError se lo split è cambiato
     ctx.log.info("split %s: SHA256 %s", scenario_csv.name, split_sha)
+    if ctx.cfg.data.traj_source == "converted_npz":
+        ctx.require("01_traj")  # le traiettorie convertite devono esistere prima dell'inventario
     out_dir = ctx.run_dir / "data"
     outs = [out_dir / "clips.csv", out_dir / "missing_takes.csv", out_dir / "inventory_summary.json"]
     if ctx.done(outs):

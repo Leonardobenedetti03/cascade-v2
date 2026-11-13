@@ -8,7 +8,10 @@ Genera sotto ``<run_dir>/synthetic_data``:
 - ``takes/<take>/closed_loop_trajectory.csv`` in formato Aria
   (``tracking_timestamp_us, t{x,y,z}_world_device, q{x,y,z,w}_world_device``);
 - ``takes/<take>/aria01_214-1.mp4``: video piccolo con colore per classe e una barra
-  la cui altezza segue la quota della traiettoria (serve a 15_alignment_check).
+  la cui altezza segue la quota della traiettoria (serve a 15_alignment_check);
+- ``split_manifest.csv`` e ``annotations/ego_pose/<split>/camera_pose/<take>.json``: le pose per frame
+  (30 Hz, matrici mondo -> camera, tempo del video) nel formato che legge lo stadio 01, che nei dati
+  sintetici ha come radice la stessa cartella (``paths.pose_roots: ["{data}"]``).
 
 La traiettoria parte ``traj_offset_s`` prima del video (orologio device in µs), così
 la modalità di allineamento ``device_us`` viene esercitata davvero. Le classi
@@ -133,11 +136,30 @@ def synthetic_video(
     return frames
 
 
+def synthetic_extrinsics(
+    t: np.ndarray, poses: np.ndarray, offset_s: float, duration_s: float, src_fps: float = 30.0
+) -> Dict[str, list]:
+    """Pose per frame nel formato di Ego-Exo4D: ``{indice: matrice 3x4 mondo -> camera}`` a ``src_fps``.
+
+    Il frame ``i`` è al tempo video ``i / src_fps``, cioè al tempo ``i / src_fps + offset_s`` della traiettoria
+    (la traiettoria parte ``offset_s`` prima del video). Serve allo stadio 01 (M08).
+    """
+    from scipy.spatial.transform import Rotation, Slerp
+
+    tv = np.arange(0, int(duration_s * src_fps) + 1) / src_fps + offset_s
+    tv = np.clip(tv, t[0], t[-1])
+    pos = np.stack([np.interp(tv, t, poses[:, k]) for k in range(3)], axis=1)
+    R = Slerp(t, Rotation.from_quat(poses[:, 3:]))(tv).as_matrix().transpose(0, 2, 1)  # camera -> mondo, poi trasposta
+    tr = -np.einsum("nij,nj->ni", R, pos)
+    E = np.round(np.concatenate([R, tr[:, :, None]], axis=2), 6)
+    return {str(i): E[i].tolist() for i in range(len(E))}
+
+
 def ensure_synthetic_dataset(ctx) -> None:
     """Genera il dataset sintetico se manca (idempotente, marker ``.complete``)."""
     root = ctx.data_root
     scfg = ctx.cfg.synthetic
-    spec = json.dumps({"synthetic": ctx.cfg.to_dict()["synthetic"]}, sort_keys=True)
+    spec = json.dumps({"synthetic": ctx.cfg.to_dict()["synthetic"], "pose_source": 1}, sort_keys=True)
     marker = root / ".complete"
     if marker.exists() and marker.read_text() == spec:
         return
@@ -161,6 +183,7 @@ def ensure_synthetic_dataset(ctx) -> None:
     takes_root = root / "takes"
     no_video = set(df[df.split == "test"].take_name.iloc[: scfg.missing_video])
     no_traj = set(df[df.split == "val"].take_name.iloc[: scfg.missing_traj])
+    pose_rows = []
     for i, r in enumerate(df.itertuples()):
         trng = make_rng(scfg.seed, i + 1)
         c = labels.index_of_task(r.task)
@@ -175,6 +198,11 @@ def ensure_synthetic_dataset(ctx) -> None:
             traj = pd.DataFrame(poses, columns=TRAJ_COLUMNS[1:])
             traj.insert(0, "tracking_timestamp_us", (traj_start_us + t * 1e6).astype(np.int64))
             traj.to_csv(tdir / "closed_loop_trajectory.csv", index=False)
+            rel = f"annotations/ego_pose/{r.split}/camera_pose/{r.take_name}.json"
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            ext = synthetic_extrinsics(t, poses, scfg.traj_offset_s, duration)
+            (root / rel).write_text(json.dumps({"aria01": {"camera_extrinsics": ext}}))
+            pose_rows.append({"take_name": r.take_name, "split": r.split, "camera_pose_file": rel})
         if r.take_name not in no_video:
             # quota in tempo video: t_traj = t_video + offset
             def z_of_t(tv, _t=t, _z=poses[:, 2]):
@@ -194,6 +222,9 @@ def ensure_synthetic_dataset(ctx) -> None:
                 "traj_start_us": traj_start_us,
             }
         )
+    pd.DataFrame(pose_rows, columns=["take_name", "split", "camera_pose_file"]).to_csv(
+        root / "split_manifest.csv", index=False
+    )
     with open(root / "takes.json", "w") as f:
         json.dump(takes, f)
     marker.write_text(spec)

@@ -64,8 +64,6 @@ def main(argv: Optional[List[str]] = None) -> None:
     args = p.parse_args(argv)
     ctx = open_stage(args, STAGE)
     cfg = ctx.cfg
-    if ctx.synthetic:
-        raise SystemExit("lo stadio 01 non gira su dati sintetici (le pose finte arrivano in C07b)")
     debug = bool(args.take or args.limit)
 
     def resolve(template: str) -> Path:

@@ -25,6 +25,7 @@ PY="${PYTHON:-python3}"
 COMMON=(--synthetic --run-name "$RUN_NAME" ${EXTRA[@]+"${EXTRA[@]}"})
 step() { echo "== $*"; "$PY" "scripts/$1" "${COMMON[@]}" "${@:2}"; }
 
+step 01_convert_trajectories.py
 step 00_inventory.py
 step 05_folds.py
 # C07: 01_convert_trajectories.py   C08: 10, 15, 20, 25, 28, 30

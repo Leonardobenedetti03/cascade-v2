@@ -15,7 +15,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M05 | Fusione `replace` di default | Fusione log-lineare | Δ = 0,0 nella v1; gli ensemble non migliorano il fronte; L1 diventa l'esperto | previsto C09 |
 | M06 | Gate per famiglie, CompareConfidence | Più di 15 gate senza riferimento | RQ2 tra famiglie citabili; la traiettoria è l'unica variabile tra `compare_A` e `compare_AC` | previsto C11 |
 | M07 | Manifest con chiavi di split e fold | Cambio di fold non rilevato a valle | Impedisce di riusare in silenzio output calcolati con fold diverse | 1d8dd17 (C05) |
-| M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | C07a (hash da inserire) |
+| M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | fe15eb0 (C07a), C07b |
 | M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | previsto C12 |
 | M10 | Costo end-to-end e sensibilità al costo delle pose | Solo GMACs e latenza dei modelli | I GMACs non misurano decodifica e camera | previsto C10 |
 | M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | previsto C13 |
@@ -51,8 +51,9 @@ La conversione è stata confrontata campione per campione con il codice v1 incor
 
 **N3 — L'inventario (00) deve girare dopo lo stadio 01, non prima.** Con la sorgente `converted_npz`, `has_traj`
 dell'inventario controlla l'esistenza degli `.npz`: se 00 gira per primo, ogni take risulta senza traiettoria. Lo stadio
-01 non dipende da 00 (legge l'elenco delle take dallo split), quindi l'ordine diventa 01 → 00. Da applicare in C07b e in
-`hpc/pipeline.sh` (nel blueprint 01 è dopo 00).
+01 non dipende da 00 (legge l'elenco delle take dallo split), quindi l'ordine diventa 01 → 00. Applicato in C07b: `00_inventory.py` pretende lo
+stadio 01 con `converted_npz`, e l'ordine è cambiato in `hpc/pipeline.sh` e nella pipeline sintetica (nel blueprint
+01 è dopo 00).
 
 **N4 — Percorsi dello stadio 01.** `paths.traj_dir` vale `{run}/01_traj` (blueprint: `{data}/traj/{run_name}`):
 `{run_name}` non è un segnaposto di `paths.resolve` e la cartella della run è già persistente. I file si chiamano
@@ -62,3 +63,15 @@ dell'inventario controlla l'esistenza degli `.npz`: se 00 gira per primo, ogni t
 `data.duration_source: video` (niente `takes.json`), `alignment.mode: same_origin`, `expected_split_counts` assente, e
 `--account`, `--partition` e `--qos` di `hpc/convert.sbatch`. `hpc/submit.sh` del blueprint passa account e partizione ma
 non la QOS: va aggiunta se il cluster la richiede.
+
+**N6 — Dati sintetici e sorgente di default.** `synthetic.py` scrive anche le pose per frame (`split_manifest.csv`,
+`annotations/ego_pose/...`, stesso formato della sorgente reale), così lo stadio 01 gira nella pipeline sintetica e in
+un test che confronta l'inventario con `converted_npz` e con i file attesi. `data.traj_source` resta `aria_csv` nei
+default (lo usano i sintetici e i test esistenti); `configs/hpc/site_v2.yaml` (C13) imposta `converted_npz` e
+`alignment.mode: same_origin`.
+
+**N7 — Valori del cluster, dagli sbatch della v1** (da mettere in `hpc/env.local.sh`, non versionato): stessi account,
+partizione `stud` e QOS `stud` per CPU e GPU; GPU richiesta con `--gpus=1` (la v1 non usava `--gres`: confermare con
+`sbatch --test-only` quale forma accetta il cluster); `module load miniconda3`; dati in `~/cascade_data`
+(`DL4CV_ROOT` e `CASCADE_DATA_ROOT`), run in `~/cascade_runs` (`CASCADE_RUN_ROOT`). La v1 ricreava il venv in `/tmp`
+a ogni job: la v2 usa un ambiente persistente (M11).

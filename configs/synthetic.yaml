@@ -9,6 +9,7 @@ paths:
   video_pattern: "{takes_root}/{take_name}/aria01_214-1.mp4"
   video_glob: "{takes_root}/{take_name}/*214-1*.mp4"
   traj_pattern: "{takes_root}/{take_name}/closed_loop_trajectory.csv"
+  pose_roots: ["{data}"]   # pose per frame finte, stesso layout della sorgente reale (stadio 01)
   camformer_ckpt: "{data}/checkpoints/missing.pt"
   egovlp_ckpt: "{data}/checkpoints/missing.pth"
 data:
