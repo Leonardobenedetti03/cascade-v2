@@ -104,6 +104,7 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "fusion",
         "frame_baseline",
     ],
+    "27_site": ["site_diag", "gate.bacc_min_takes"],
     "50_gate": ["gate", "fusion.mode"],
     "52_seeds": ["gate", "fusion.mode"],
 }
@@ -111,7 +112,15 @@ STAGE_KEYS: Dict[str, List[str]] = {
 # [M07] Un cambio di split o di fold deve invalidare tutto ciò che ne dipende. Senza queste chiavi
 # is_done() considera "già fatto" uno stadio a valle calcolato con fold vecchie e lo salta.
 SPLIT_KEYS = ["paths.scenario_csv", "paths.split_sha256", "folds"]
-SPLIT_DEPENDENT_STAGES = ("20_camformer", "28_frame_baseline", "30_l1_heads", "35_fusion", "45_cache", "50_gate")
+SPLIT_DEPENDENT_STAGES = (
+    "20_camformer",
+    "28_frame_baseline",
+    "30_l1_heads",
+    "35_fusion",
+    "45_cache",
+    "50_gate",
+    "27_site",
+)
 for _stage in SPLIT_DEPENDENT_STAGES:
     STAGE_KEYS[_stage] = STAGE_KEYS[_stage] + [k for k in SPLIT_KEYS if k not in STAGE_KEYS[_stage]]
 

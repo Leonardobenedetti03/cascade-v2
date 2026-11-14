@@ -106,6 +106,12 @@ cost:
   device: auto
   expected: {camformer: 0.02, timesformer_4f: 90.0}   # sanity check, ordine di grandezza
 
+# Diagnostiche di sito (stadio 27, M02): sonda lineare sulle CLS di L1, solo train e val.
+site_diag:
+  C: 0.1          # come check_site.py della v1
+  max_iter: 500
+  cv_folds: 5     # GroupKFold per take e per sessione
+
 # Costo end-to-end (stadio 41, M10): tempo per fase di L0 e L1, a batch 1.
 cost_e2e:
   n_clips: 200    # campione stratificato per classe

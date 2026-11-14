@@ -34,6 +34,7 @@ step 15_alignment_check.py --n-takes 2
 # shellcheck disable=SC2086
 for f in $FOLDS; do step 20_camformer_finetune.py --fold "$f"; done
 step 25_egovlp_features.py
+step 27_site_diagnostics.py
 step 28_frame_baseline.py
 step 30_l1_heads.py
 step 35_fusion.py
@@ -42,7 +43,7 @@ step 41_cost_e2e.py
 step 45_build_cache.py
 step 50_gate_eval.py --final --set gate.bacc_min_takes=1
 # C08b: 15, 25, 28, 30   C10: 40, 41   C12a: 35, 45   C12b: 50 --final
-# C12c: 27   C13: 55   (52 richiede almeno 2 seed di CamFormer: provato in tests/test_stage_50_52.py)
+# C12c: 27 (dopo 25)   C13: 55   (52 richiede almeno 2 seed di CamFormer: provato in tests/test_stage_50_52.py)
 
 RUN_DIR=$("$PY" -c "from src.cascade.paths import run_dir; print(run_dir('$RUN_NAME'))")
 echo "== fatto: $RUN_DIR"

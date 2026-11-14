@@ -9,19 +9,19 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | ID | Che cosa cambia | Prima (v1) | Perché | Commit |
 |----|-----------------|------------|--------|--------|
 | M01 | Repository nuovo, codice portato selettivamente | Estensioni non usate e script di lancio fuori dal repository | Il codice consegnato è quello che produce i risultati | 9c9147d (C01) … |
-| M02 | Split per sito: test georgiatech, val nus + fair | Split ufficiali per take | L1 al 99% riconosce in parte il laboratorio; leave-one-site-out 61,7%; criteri fissati prima dei risultati | v1 3d5f3b4; v2 88384ba |
+| M02 | Split per sito: test georgiatech, val nus + fair | Split ufficiali per take | L1 al 99% riconosce in parte il laboratorio; leave-one-site-out 61,7%; criteri fissati prima dei risultati | v1 3d5f3b4; v2 88384ba; stadio 27 in C12c (hash in C13) |
 | M03 | Fold di train per sito | Fold per take | Le predizioni fuori campione devono simulare lo spostamento verso siti nuovi | 88384ba (C06) |
 | M04 | CamFormer da zero | Checkpoint pubblico come default | Il pretraining ha visto circa il 95% di train e val | d134b40 (C08a) |
 | M05 | Fusione `replace` di default | Fusione log-lineare | Δ = 0,0 nella v1; gli ensemble non migliorano il fronte; L1 diventa l'esperto | aefe79b (C09) |
 | M06 | Gate per famiglie, CompareConfidence | Più di 15 gate senza riferimento | RQ2 tra famiglie citabili; la traiettoria è l'unica variabile tra `compare_A` e `compare_AC` | 9b9b0fb (C11) |
 | M07 | Manifest con chiavi di split e fold | Cambio di fold non rilevato a valle | Impedisce di riusare in silenzio output calcolati con fold diverse | 1d8dd17 (C05) |
 | M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | fe15eb0 (C07a), 31714af (C07b) |
-| M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | previsto C12 |
+| M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | 4d55e67 (C12b); C12c (hash in C13) |
 | M10 | Costo end-to-end e sensibilità al costo delle pose | Solo GMACs e latenza dei modelli | I GMACs non misurano decodifica e camera | f7e6325 (C10) |
 | M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | previsto C13 |
 | M12 | Estensioni non portate: streaming, keystep, fine-tuning di L1, gate bayesiano | Presenti nel codice | Fuori dalle RQ; restano nella v1 | 41b0f62 (C04), ca2154f (C08b) |
 | M13 | Baseline a un frame eseguita; tre livelli come analisi secondaria | Codice presente, mai eseguito | Senza, il confronto sul costo è incompleto | previsto C08 |
-| M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | previsto C12 |
+| M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | 4d55e67 (C12b); C12c (hash in C13) |
 | M15 | Epoche e patience di CamFormer (D3) | 30 epoche, patience 5 | Fold 0 e full al tetto con la perdita in calo | d134b40 (C08a) |
 | M16 | `results/` nel repository | Risultati solo sull'HPC e in un backup | Ogni numero del report ha run e commit | previsto dopo le run |
 
@@ -144,4 +144,32 @@ blueprint e il codice divergevano o non dicevano:
   Sono avvisi spuri: `@` ed `einsum` danno gli stessi numeri e tutti i valori sono finiti. Non si filtrano, per non
   nascondere avvisi veri; su Linux con OpenBLAS non dovrebbero comparire (da controllare sull'HPC in C13).
 
-Il commit di C12b (M09, M14) entra nelle righe M09 e M14 della tabella con il commit di C12c.
+Il commit di C12b (4d55e67) è entrato nelle righe M09 e M14 della tabella con C12c.
+
+**N19 — C12c: diagnostiche di sito (stadio 27; M02, M09, M14).** Scelte prese dove blueprint (12.6) e brief divergevano.
+
+- Le tre analisi del blueprint vanno in tre file: leave-one-site-out per sito e per classe in `loso.csv` (a),
+  leggibilità del sito dalle CLS in `site_probe.json` (b; è nuova: nella v1 `check_leak.py` predice la classe, non il
+  sito), baseline «classe più frequente del sito» in `site_majority.json` (c). In `site_probe.json` c'è anche il
+  controllo di `check_leak.py` (CV della classe per take e per sessione, `label_cv`): il salto rispetto al
+  leave-one-site-out è la misura della scorciatoia di sito.
+- Perimetro: train e val, mai il test. Lo stadio gira fuori da `50 --final`, come 25 e 30. La v1 usava tutte le take,
+  quindi i numeri non sono confrontabili: il 61,7% citato in M02 resta il numero della v1, con quel perimetro.
+- Il sito è il prefisso del `take_uid`; la sessione è il `take_uid` senza l'ultimo suffisso (come in `check_leak.py`).
+  Sonda: StandardScaler + LogisticRegression con C = 0,1 e max_iter = 500 (`site_diag.C`, `site_diag.max_iter`), CV con
+  `site_diag.cv_folds` = 5. Gli avvisi di convergenza non si nascondono: si contano in `fits` di `site_probe.json`.
+- Nel leave-one-site-out si valutano solo le clip la cui classe è nel train di quel giro (come `check_site.py`); le
+  escluse sono contate. `reported` segue `gate.bacc_min_takes` (M14: Bouldering resta fuori dalle medie per classe).
+- I ruoli per la baseline vengono da `load_scenario` (indici di `labels.yaml`) e non da `roles_from_scenario`, che usa
+  la colonna `label` del CSV, in un altro ordine: servono i nomi delle classi. `site_majority_accuracy` è invariata:
+  in-sample sul train e su tutte le take dello split, anche quelle senza video.
+- Lo stadio `27_site` è in `STAGE_KEYS` (`site_diag`, `gate.bacc_min_takes`) e tra gli stadi che dipendono dallo split
+  (M07). Nessuna variante per seed: usa le CLS dello stadio 25 e non dipende da CamFormer. `hpc/submit.sh`,
+  `hpc/pipeline.sh` e `hpc/collect_results.sh` lo prevedevano già.
+- Dati sintetici: tutti i `take_uid` iniziano con `syn`, quindi c'è un solo sito. La sonda si salta (`skipped` nel
+  JSON, `loso.csv` con la sola intestazione) e lo stadio scrive comunque i tre file; la logica con più siti è provata
+  in `tests/test_site_diag.py` su array costruiti a mano.
+- Aperti, non toccati qui: M13 dice ancora «previsto C08», ma `three_level` non è stato portato (N18), quindi la
+  cascata a tre livelli non è valutata nello stadio 50; il blueprint (11.2) ha `transfer_budgets` da 0,1 a 0,9, la
+  config [0,25; 0,5].
+- L'hash di C12c entra in M02, M09 e M14 con il commit successivo (C13), come per gli altri.

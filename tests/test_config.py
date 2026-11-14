@@ -61,6 +61,7 @@ def test_new_sections_have_defaults():
     cfg = load_config()
     assert cfg.gate.compare.inner_cv == 3 and 1.0 in cfg.gate.compare.Cs
     assert cfg.cost_e2e.n_clips == 200 and cfg.cost_e2e.passes == 2
+    assert cfg.site_diag.C == 0.1 and cfg.site_diag.cv_folds == 5
     assert (
         cfg.folds.group_by == "site"
         and cfg.paths.split_sha256 == "c9f4e3083f57b099ef9693a5fa57b2f8666bddb6f4377834a7d015e2c7e0344d"

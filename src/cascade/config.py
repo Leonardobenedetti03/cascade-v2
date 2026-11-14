@@ -251,6 +251,15 @@ class CostE2ECfg:
 
 
 @dataclass
+class SiteDiagCfg:
+    """Diagnostiche di sito (stadio 27, M02): sonda lineare sulle CLS di L1, solo train e val."""
+
+    C: float = 0.1  # regolarizzazione della logistica (come check_site.py della v1)
+    max_iter: int = 500
+    cv_folds: int = 5  # GroupKFold per take e per sessione (leggibilità del sito, CV della classe)
+
+
+@dataclass
 class SyntheticCfg:
     takes_per_class: Dict[str, int] = field(default_factory=lambda: {"train": 12, "val": 4, "test": 4})
     duration_s: List[float] = field(default_factory=lambda: [12.0, 20.0])
@@ -280,6 +289,7 @@ class Config:
     fusion: FusionCfg = field(default_factory=FusionCfg)
     cost: CostCfg = field(default_factory=CostCfg)
     cost_e2e: CostE2ECfg = field(default_factory=CostE2ECfg)
+    site_diag: SiteDiagCfg = field(default_factory=SiteDiagCfg)
     gate: GateCfg = field(default_factory=GateCfg)
     synthetic: SyntheticCfg = field(default_factory=SyntheticCfg)
 
@@ -470,6 +480,9 @@ def validate_config(cfg: Config) -> None:
     ce = cfg.cost_e2e
     if ce.n_clips < 1 or ce.n_warmup < 0 or ce.passes < 1:
         e.append("cost_e2e: n_clips >= 1, n_warmup >= 0, passes >= 1")
+    sd = cfg.site_diag
+    if sd.C <= 0 or sd.max_iter < 1 or sd.cv_folds < 2:
+        e.append("site_diag: C > 0, max_iter >= 1, cv_folds >= 2")
     if e:
         raise ValueError("config non valida:\n  - " + "\n  - ".join(e))
 
