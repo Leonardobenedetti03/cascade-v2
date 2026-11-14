@@ -105,6 +105,7 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "frame_baseline",
     ],
     "50_gate": ["gate", "fusion.mode"],
+    "52_seeds": ["gate", "fusion.mode"],
 }
 
 # [M07] Un cambio di split o di fold deve invalidare tutto ciò che ne dipende. Senza queste chiavi

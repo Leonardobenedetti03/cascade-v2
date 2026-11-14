@@ -40,8 +40,9 @@ step 35_fusion.py
 step 40_cost.py
 step 41_cost_e2e.py
 step 45_build_cache.py
-# C08b: 15, 25, 28, 30   C10: 40, 41   C12a: 35, 45
-# C12: 27, 50 --final, 52   C13: 55
+step 50_gate_eval.py --final --set gate.bacc_min_takes=1
+# C08b: 15, 25, 28, 30   C10: 40, 41   C12a: 35, 45   C12b: 50 --final
+# C12c: 27   C13: 55   (52 richiede almeno 2 seed di CamFormer: provato in tests/test_stage_50_52.py)
 
 RUN_DIR=$("$PY" -c "from src.cascade.paths import run_dir; print(run_dir('$RUN_NAME'))")
 echo "== fatto: $RUN_DIR"

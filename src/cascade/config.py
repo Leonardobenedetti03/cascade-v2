@@ -228,7 +228,10 @@ class GateCfg:
     seeds: List[int] = field(default_factory=lambda: [0, 1, 2])
     r_step: int = 1
     budgets: List[float] = field(default_factory=lambda: [0.25, 0.5])
-    within_pts: float = 0.01
+    within_pts: float = 0.01  # "entro 1 punto da always_L1" (costo minimo, curva di Pareto)
+    improvement_deltas: List[float] = field(default_factory=lambda: [0.0, 0.01])  # δ di I(δ) (M09)
+    bacc_min_takes: int = 5  # accuratezza bilanciata: classi con almeno tante take nello split (M14)
+    transfer_budgets: List[float] = field(default_factory=lambda: [0.25, 0.5])  # soglie val → test (RQ1)
     operating_budget: float = 0.5
     bootstrap: int = 1000
     bootstrap_seed: int = 0
@@ -454,6 +457,12 @@ def validate_config(cfg: Config) -> None:
         e.append("gate.budgets e gate.operating_budget in (0, 1]")
     if not 1 <= g.r_step <= 100:
         e.append("gate.r_step in [1, 100]")
+    if not g.improvement_deltas or not all(0 <= d < 1 for d in g.improvement_deltas):
+        e.append("gate.improvement_deltas: lista non vuota di valori in [0, 1)")
+    if g.bacc_min_takes < 1 or not 0 <= g.within_pts < 1:
+        e.append("gate.bacc_min_takes >= 1 e gate.within_pts in [0, 1)")
+    if not g.transfer_budgets or not all(0 < b <= 1 for b in g.transfer_budgets):
+        e.append("gate.transfer_budgets: lista non vuota di valori in (0, 1]")
     if any(len(p) != 2 for p in g.comparisons):
         e.append("gate.comparisons: coppie [A, B]")
     if not g.compare.Cs or g.compare.inner_cv < 2:

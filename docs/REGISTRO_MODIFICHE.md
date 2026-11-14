@@ -110,3 +110,38 @@ copie duplicate.
 **N16 (C11, M06).** Gate portato dalla v1 (la cartella `gate/` era vuota in v2) con le modifiche del blueprint. `models.py`: aggiunto `CompareGate` (sottoclasse di `LogRegGate`, `class_weight=None`, `target = "c1"`, score `η̂₁ − p_max`; il primo gruppo deve essere A) e il ramo `compare_` in `make_gate`; tolti `RidgeGate`, `LGBMRegGate` e il ramo bayesiano. `make_gate(name, gcfg)` perde il parametro `labels`, che serviva solo al gate bayesiano: lo stadio 50 (C12) lo chiama così. `features.py`: tolti i gruppi `mc` e `take` e l'affidabilità Beta-Binomiale (`FeatureBuilder` perde `reliability_mode`, `beta_n0`, `beta_q`, `prior_confusion`); restano A, B, C, `onehot` ed `emb` (il blueprint toglie solo `mc` e `take`, quindi `onehot` resta). `protocol.py`: `run_gate` sceglie la colonna bersaglio da `gate.target` con `TARGET_COLUMN = {"hard": "y", "c1": "c1"}`; tolti il bersaglio `soft`, il livello −1 (`level_minus1_forced`) e il ramo `needs_class`. `gate/bayes.py` non si porta. `GateCfg` perde `reliability`, `beta_n0`, `beta_q`, `prior_confusion` e `ridge_alphas`: `reliability: beta` richiedeva `bayes.py`, quindi resta solo l'affidabilità empirica (scelta presa qui, il blueprint non la fissa). `motion.py` (gruppo C) non era ancora in v2: copiato da v1 senza modifiche (TIENI). `configs/gate.yaml` segue le famiglie della sezione 5.2: modelli `always_L0, always_L1, random, oracle, thr_maxprob, thr_margin, thr_entropy, logreg_A, logreg_AC, logreg_ABC, lgbm_ABC, compare_A, compare_AC`; confronti `[compare_A, thr_maxprob]` e `[compare_AC, compare_A]` (le due coppie di RQ2) più `[logreg_AC, logreg_A]` (scelta mia: lo stesso effetto della traiettoria nella famiglia addestrata su y). Test: `test_gate` riscritto senza `cache/mock.py` (C12), con una cache finta costruita nel test e `roc_auc_score` di sklearn al posto di `src.eval.metrics.roc_auc`; `test_compare_gate` nuovo, con il test sintetico del blueprint (un L1 che riesce dove la velocità è alta); non si portano `test_level_minus1` né i test bayesiani. `tests/test_motion.py` portato da v1 senza modifiche. Le diagnostiche D1/D2 (AUROC di η̂₁ contro c1, tabella `diag_c1.csv`) vanno nello stadio 50 (C12). `lightgbm` su macOS richiede `libomp` (`brew install libomp`).
 
 **N17 (C12a, M05).** Cache e fusione portati dalla v1: `cache/build.py`, `cache/schema.py`, `cache/mock.py` e gli stadi 35 e 45. `build.py` importa `check_loss` e `ProvenanceError` da `cache/checks.py` (N11) e li riesporta (i test li importano anche da lì); tolte le colonne e i vettori MC dropout (`CAM_VECTORS`, `MC_VECTORS`, `MC_SCALARS`), perché il gruppo `mc` del gate non esiste più (N16). `schema.py`: tolto il ramo `fusion_mode == "learned"` (un `w` NaN ora è un errore), le colonne opzionali MC e `take_duration`. `mock.py`: tolta l'opzione `mc`; con `choose_w` in modalità `replace` la fusione finta coincide con L1. Stadio 35: tolti `learned_fusion`, `fused_learned.parquet` e il tag `_l1ft`; output in `35_fusion/seed<S>_hz<F>/`. Stadio 45: tolti il ramo della fusione appresa e la colonna `take_duration` (serviva all'analisi degli errori, che non si porta). `manifest.py`: le chiavi dello stadio 35 aggiungono `camformer.eval_source`, `gate.bootstrap` e `gate.bootstrap_seed`; quelle del 45 aggiungono `data.window_s`, `data.min_traj_coverage`, `data.traj_fps`, `camformer.eval_source`, `fusion` e `frame_baseline` (prima un cambio di fusione o di baseline non invalidava la cache; scelta mia, il blueprint non elenca le chiavi). Test: `test_cache_build` (con `eval_source=full` e `load_l1`), `test_cache_schema` con `test_label_y` riscritto (il corpo originale della v1 non era stato letto) e `test_mock_fusion_is_replace`. Non c'è un test pytest di integrazione per 35 e 45: li esegue `scripts/run_synthetic_pipeline.sh`, che li ha dopo 30 e dopo 41.
+
+**N18 — C12b: valutazione dei gate (stadi 50 e 52).** Scelte prese durante la scrittura di M09 e M14, dove il
+blueprint e il codice divergevano o non dicevano:
+
+- `gate.within_pts` resta uno scalare (0,01) e indica il costo minimo «entro un punto da always_L1»; i δ di I(δ)
+  stanno in `gate.improvement_deltas` = [0; 0,01]. Il blueprint elencava i δ dentro `within_pts`. Campi nuovi di
+  `GateCfg`: `bacc_min_takes` = 5 e `transfer_budgets` = [0,25; 0,5].
+- Nessuna decisione forzata del livello −1: il vettore `forced` della v1 non esiste più (livello non portato, M12/M13).
+- I(δ) = C_L1 / C(r*_δ), con il numeratore letto dalla curva (`cost[r = 100] − cost[r = 0]`). Con `replace` il minimo
+  è C_L1 / (C_L0 + C_L1) ≈ 0,9987: sotto 1 la cascata non risparmia nulla.
+- Accuratezza bilanciata (`bacc_*`) = media sulle classi del richiamo per take, con le sole classi che hanno almeno 5
+  take nello split (Bouldering resta fuori, M14). Se nessuna classe arriva a 5, la metrica è NaN e non un errore.
+  Il gate di riferimento per la cascata per classe è quello con `bacc_area` maggiore su val.
+- Trasferimento delle soglie (RQ1, solo con `--final`): la soglia scelta su val per un budget di costo
+  (C_L0 + r·C_L1 ≤ b·(C_L0 + C_L1), quindi a b = 0,5 la quota è appena sotto il 50%) applicata al test, con lo
+  sforamento di costo e il divario di accuratezza rispetto alla soglia ricalcolata sul test, che è solo un riferimento.
+  Si saltano i gate a r fisso e l'oracolo.
+- Diagnostica D1: AUROC di η̂₁ = score + p_max contro c1 per `compare_A` e `compare_AC`, su train fuori campione e
+  val, mai sul test (la funzione solleva un errore). Celle A/B/D/N per split e classe in `cells.csv`.
+- `--final` sullo stadio 50 rigira sempre (non consulta il manifest), scrive `FINAL_DONE` e una riga in
+  `FINAL_RUNS.log`; senza `--final` lo stadio si rifiuta di girare se `FINAL_DONE` esiste nella cartella.
+- Lo stadio 52 aggrega anche `threshold_transfer` e `diag_c1`; cade il suffisso `_l1ft` (fine-tuning di L1 non portato).
+- Pipeline sintetica: lo stadio 50 gira con `gate.bacc_min_takes=1`, perché con 2 take per classe in val e test
+  la soglia di 5 lascerebbe la bacc sempre NaN e il percorso non verrebbe esercitato.
+- Le moltiplicazioni per i pesi bootstrap usano `einsum` e non `@`: con numpy 2.0 e Accelerate (macOS arm64)
+  `@` emette avvisi spuri («divide by zero / overflow / invalid value in matmul») su numeri finiti; verificato
+  che i risultati coincidono con `einsum` (differenza 0 sui conteggi, ~1e-11 sui costi).
+- Non portati dalla v1: `three_level`, `error_analysis`, `_cohen_d`, il gate `bayes_*` e `src.eval.metrics`
+  (l'AUROC viene da scikit-learn).
+- Sul Mac (numpy 2.0.2 con Accelerate; Python 3.9 non permette numpy più recenti) le pipeline stampano centinaia di
+  `RuntimeWarning: ... encountered in matmul` da `gate/features.py` e dalla regressione logistica di scikit-learn.
+  Sono avvisi spuri: `@` ed `einsum` danno gli stessi numeri e tutti i valori sono finiti. Non si filtrano, per non
+  nascondere avvisi veri; su Linux con OpenBLAS non dovrebbero comparire (da controllare sull'HPC in C13).
+
+Il commit di C12b (M09, M14) entra nelle righe M09 e M14 della tabella con il commit di C12c.

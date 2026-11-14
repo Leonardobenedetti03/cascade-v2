@@ -39,6 +39,9 @@ gate:
   r_step: 1                      # quota di escalation r in %, da 0 a 100
   budgets: [0.25, 0.5]           # frazioni del costo di always_L1
   within_pts: 0.01               # "entro 1 punto da always_L1"
+  improvement_deltas: [0.0, 0.01]  # I(δ) = C_L1 / C(r*_δ): costo minimo per stare entro δ da always_L1
+  bacc_min_takes: 5              # accuratezza bilanciata: classi con almeno 5 take nello split
+  transfer_budgets: [0.25, 0.5]  # RQ1: soglia scelta su val per questi budget, applicata al test
   operating_budget: 0.5          # punto di lavoro scelto su val
   bootstrap: 1000
   bootstrap_seed: 0
