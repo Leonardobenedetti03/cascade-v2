@@ -84,7 +84,7 @@ STAGE_KEYS: Dict[str, List[str]] = {
     ],
     "28_frame_baseline": ["frame_baseline", "paths.frame_baseline_ckpt"],
     "30_l1_heads": ["seed", "heads"],
-    "35_fusion": ["fusion"],
+    "35_fusion": ["fusion", "camformer.eval_source", "gate.bootstrap", "gate.bootstrap_seed"],
     "40_cost": [
         "cost",
         "camformer.arch",
@@ -94,7 +94,16 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "data.traj_fps",
         "frame_baseline",
     ],
-    "45_cache": ["data.vertical_axis", "data.max_missing_frac"],
+    "45_cache": [
+        "data.vertical_axis",
+        "data.max_missing_frac",
+        "data.window_s",
+        "data.min_traj_coverage",
+        "data.traj_fps",
+        "camformer.eval_source",
+        "fusion",
+        "frame_baseline",
+    ],
     "50_gate": ["gate", "fusion.mode"],
 }
 
