@@ -36,6 +36,8 @@ for f in $FOLDS; do step 20_camformer_finetune.py --fold "$f"; done
 step 25_egovlp_features.py
 step 28_frame_baseline.py
 step 30_l1_heads.py
+step 40_cost.py
+step 41_cost_e2e.py
 # C08b: 15, 25, 28, 30
 # C09: 35   C10: 40, 41   C12: 27, 45, 50 --final, 52   C13: 55
 

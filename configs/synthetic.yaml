@@ -46,6 +46,9 @@ gate:
   bootstrap: 100
   random_seeds: 3
   seeds: [0, 1]
+cost_e2e:
+  n_clips: 12
+  n_warmup: 2
 cost:
   # i modelli sintetici sono minuscoli: si usano i costi delle architetture reali (misurati)
   override_gmacs: {L0: 0.1216, L1: 92.31, Lhalf: 0.0153}
