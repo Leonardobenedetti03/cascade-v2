@@ -93,12 +93,8 @@ heads:
   max_iter: 2000
 
 fusion:
-  mode: fuse                 # fuse (log-lineare) | replace (solo L1) | learned (logistica appresa)
+  mode: replace              # replace (L1 sostituisce L0, M05) | fuse (log-lineare, ablation)
   w_grid_step: 0.05
-  # fusione appresa (B5): logistica fuori campione; cam_emb possibile ma ogni fold ha il suo
-  # spazio di embedding, quindi di default si usano le log-probabilità OOF di CamFormer
-  learned_features: [cam_logprobs, vid_cls]
-  compare_learned: true      # nel confronto di 35 anche quando mode != learned
 
 cost:
   timesformer_frames: [4, 8, 16]

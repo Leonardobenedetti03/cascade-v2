@@ -192,10 +192,8 @@ class HeadsCfg:
 
 @dataclass
 class FusionCfg:
-    mode: str = "fuse"  # fuse | replace | learned
+    mode: str = "replace"  # replace (L1 sostituisce L0, M05) | fuse (log-lineare, ablation)
     w_grid_step: float = 0.05
-    learned_features: List[str] = field(default_factory=lambda: ["cam_logprobs", "vid_cls"])
-    compare_learned: bool = True  # calcola comunque la fusione appresa per il confronto
 
 
 @dataclass
@@ -451,7 +449,7 @@ def validate_config(cfg: Config) -> None:
     fb = cfg.frame_baseline
     if not 0 <= fb.frame_index < fr.n_frames or fb.size < 16 or not 1 <= fb.r_step <= 100:
         e.append("frame_baseline: frame_index in [0, n_frames), size >= 16, r_step in [1, 100]")
-    _one_of(e, "fusion.mode", cfg.fusion.mode, ["fuse", "replace", "learned"])
+    _one_of(e, "fusion.mode", cfg.fusion.mode, ["fuse", "replace"])
     _one_of(e, "heads.source", cfg.heads.source, ["probe"])  # il fine-tuning di L1 non si porta (M12)
     if not 0 < cfg.fusion.w_grid_step <= 1:
         e.append("fusion.w_grid_step in (0, 1]")

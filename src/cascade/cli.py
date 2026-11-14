@@ -102,9 +102,8 @@ class StageContext:
 
     @property
     def variant_tag(self) -> str:
-        """Identità di una cascata: variante di L0, più ``_flearn`` con la fusione appresa
-        (si toglie in C09). Identifica gli output di 35, 45 e 50."""
-        return self.cam_tag + ("_flearn" if self.cfg.fusion.mode == "learned" else "")
+        """Identità di una cascata: la variante di L0. Identifica gli output di 35, 45 e 50."""
+        return self.cam_tag
 
     def seed_dir(self, stage: str) -> Path:
         """Cartella della variante di L0 (stadio 20)."""

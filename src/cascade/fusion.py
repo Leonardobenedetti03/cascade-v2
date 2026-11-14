@@ -2,7 +2,8 @@
 
 ``log p_fusa = w · log p_cam + (1 − w) · log p_vid`` (poi rinormalizzata).
 ``w`` si sceglie su una griglia in [0, 1] con le uscite fuori campione del train:
-massima accuracy, a parità minima NLL. ``mode = replace`` (ablation) fissa ``w = 0``.
+massima accuracy, a parità minima NLL. ``mode = replace`` (default, M05) fissa ``w = 0``: L1 sostituisce
+L0; ``mode = fuse`` è l'ablation con la griglia.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ def nll(probs: np.ndarray, y: np.ndarray) -> float:
 
 
 def choose_w(
-    p_cam: np.ndarray, p_vid: np.ndarray, y: np.ndarray, step: float = 0.05, mode: str = "fuse"
+    p_cam: np.ndarray, p_vid: np.ndarray, y: np.ndarray, step: float = 0.05, mode: str = "replace"
 ) -> Tuple[float, List[Dict[str, float]]]:
     """Restituisce (w scelto, griglia con accuracy e NLL per ogni w)."""
     if mode == "replace":
@@ -48,42 +49,9 @@ def choose_w(
     return best["w"], grid
 
 
-# --------------------------------------------------------------------------- fusione appresa (B5)
-LEARNED_FEATURES = ("cam_logprobs", "vid_cls", "cam_emb")
-
-
-def fusion_features(table, kinds) -> np.ndarray:
-    """Feature della fusione appresa per ogni riga della tabella L0 ⋈ L1.
-
-    ``cam_logprobs``: log delle probabilità calibrate OOF di CamFormer (8). Sono confrontabili
-    tra fold (stesse classi), a differenza di ``cam_emb``: ogni fold ha il suo modello
-    fine-tuned e quindi il suo spazio di embedding (opzione possibile, ma va saputo).
-    ``vid_cls``: CLS di EgoVLP congelato (768), stesso spazio per tutte le clip.
-    """
-    mats = []
-    for k in kinds:
-        if k not in LEARNED_FEATURES:
-            raise ValueError(f"fusion.learned_features: {k!r} non valido ({list(LEARNED_FEATURES)})")
-        if k == "cam_logprobs":
-            mats.append(np.log(np.clip(table.arrays["cam_probs_cal"], EPS, 1.0)))
-        else:
-            mats.append(table.arrays[k])
-    return np.concatenate(mats, axis=1).astype(np.float64)
-
-
-def learned_fusion(table, folds, hcfg, n_classes: int, kinds, seed: int = 0):
-    """Fusione appresa fuori campione: per la fold k logistica sulle fold ≠ k (senza holdout),
-    temperatura sull'holdout, predizione della fold k; val/test = media dei K modelli.
-    Restituisce (probabilità [N, C], riepilogo per fold)."""
-    from src.cascade.heads import run_heads
-
-    res, summary = run_heads(table.df, fusion_features(table, kinds), folds, hcfg, n_classes, seed)
-    return res["vid_probs_cal"].astype(np.float64), summary
-
-
-def compare_fusions(table, w: float, learned=None, n_boot: int = 1000, seed: int = 0):
-    """Accuratezza e NLL (per take dove serve) di L0, L1, fusione log-lineare, sostituzione e
-    fusione appresa su train OOF e val, con IC appaiato della differenza rispetto a L1."""
+def compare_fusions(table, w: float, n_boot: int = 1000, seed: int = 0):
+    """Accuratezza e NLL di L0, L1 (sostituzione) e fusione log-lineare su train OOF e val,
+    con IC appaiato della differenza rispetto a L1."""
     rows = []
     y_all = table.df.label_idx.to_numpy()
     systems = {
@@ -91,8 +59,6 @@ def compare_fusions(table, w: float, learned=None, n_boot: int = 1000, seed: int
         "L1 (sostituzione)": table.arrays["vid_probs_cal"],
         f"log-lineare (w={w:.2f})": fuse(table.arrays["cam_probs_cal"], table.arrays["vid_probs_cal"], w),
     }
-    if learned is not None:
-        systems["appresa"] = learned
     rng = np.random.default_rng(seed)
     for split in ("train", "val"):
         m = (table.df.split == split).to_numpy()
