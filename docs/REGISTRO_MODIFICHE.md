@@ -11,7 +11,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M01 | Repository nuovo, codice portato selettivamente | Estensioni non usate e script di lancio fuori dal repository | Il codice consegnato è quello che produce i risultati | 9c9147d (C01) … |
 | M02 | Split per sito: test georgiatech, val nus + fair | Split ufficiali per take | L1 al 99% riconosce in parte il laboratorio; leave-one-site-out 61,7%; criteri fissati prima dei risultati | v1 3d5f3b4; v2 88384ba |
 | M03 | Fold di train per sito | Fold per take | Le predizioni fuori campione devono simulare lo spostamento verso siti nuovi | 88384ba (C06) |
-| M04 | CamFormer da zero | Checkpoint pubblico come default | Il pretraining ha visto circa il 95% di train e val | previsto C08 |
+| M04 | CamFormer da zero | Checkpoint pubblico come default | Il pretraining ha visto circa il 95% di train e val | d134b40 (C08a) |
 | M05 | Fusione `replace` di default | Fusione log-lineare | Δ = 0,0 nella v1; gli ensemble non migliorano il fronte; L1 diventa l'esperto | previsto C09 |
 | M06 | Gate per famiglie, CompareConfidence | Più di 15 gate senza riferimento | RQ2 tra famiglie citabili; la traiettoria è l'unica variabile tra `compare_A` e `compare_AC` | previsto C11 |
 | M07 | Manifest con chiavi di split e fold | Cambio di fold non rilevato a valle | Impedisce di riusare in silenzio output calcolati con fold diverse | 1d8dd17 (C05) |
@@ -22,7 +22,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M12 | Estensioni non portate: streaming, keystep, fine-tuning di L1, gate bayesiano | Presenti nel codice | Fuori dalle RQ; restano nella v1 | 41b0f62 (C04) |
 | M13 | Baseline a un frame eseguita; tre livelli come analisi secondaria | Codice presente, mai eseguito | Senza, il confronto sul costo è incompleto | previsto C08 |
 | M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | previsto C12 |
-| M15 | Epoche e patience di CamFormer (D3) | 30 epoche, patience 5 | Fold 0 e full al tetto con la perdita in calo | previsto C08 |
+| M15 | Epoche e patience di CamFormer (D3) | 30 epoche, patience 5 | Fold 0 e full al tetto con la perdita in calo | d134b40 (C08a) |
 | M16 | `results/` nel repository | Risultati solo sull'HPC e in un backup | Ogni numero del report ha run e commit | previsto dopo le run |
 
 ## Note di lavorazione
@@ -91,3 +91,14 @@ test (`test_heads`); il test di `fusion.py` e le modifiche di M05 restano in C09
 `configs/camformer.yaml`: `pretrained: false`, 50 epoche, patience 8; i default delle dataclass non cambiano.
 `TrajectoryWindowDataset.prefix_frac` e `role_datasets(prefix_frac, roles)` restano come nella v1 (servivano alla
 variante causale, tolta in M12): da togliere in un commit di pulizia.
+
+**N11 — `cache/checks.py` anticipato.** Nella v1 `check_loss` e `ProvenanceError` stanno in `cache/build.py` (stadio 45,
+C12), ma gli stadi 25, 28 e 30 (C08b) li importano. Invece di anticipare `build.py` intero, i due simboli si portano
+identici in `src/cascade/cache/checks.py` (con `tests/test_checks.py`); in C12 `build.py` li importerà da lì, senza
+copie duplicate.
+
+**N12 — `eval/style.py` anticipato.** Lo stadio 15 (figura di allineamento) importa `GRID`, `SERIES`, `SURFACE` e
+`TEXT2` da `eval/report.py` (C13). Le quattro costanti (colori della v1) vivono in `src/cascade/eval/style.py`; in C13
+`report.py` le importerà da lì. Le altre costanti di palette (`TEXT`, `REF_GRAY`, `SEQ_BLUE`) restano in `report.py`.
+
+**N13 — Modelli e stadi di L1 e della baseline (C08b).** Portati dalla v1: `models/egovlp.py`, `models/frame_baseline.py`, `models/vendor/egovlp_video_transformer.py` (copia modificata dal submodule `third_party/EgoVLP`, 85 righe di differenza: va tenuta identica alla v1), `tests/test_egovlp.py` e gli stadi 15, 25, 28 e 30. Cambiano solo gli import: `check_loss` e `ProvenanceError` da `cache/checks.py` (N11), le costanti di colore da `eval/style.py` (N12). Non si porta `models/egovlp_finetune.py` (stadio 26, M12). La pipeline sintetica esegue 15 dopo il 10 e 25, 28 e 30 dopo i 20; la baseline a un frame gira perché `frame_baseline.enabled` è `true` in `configs/synthetic.yaml`.
