@@ -1,30 +1,27 @@
 # Gate e valutazione (sezione 6). Feature solo da L0 e dalla traiettoria.
+# Famiglie (blueprint 5.2): riferimenti, selettivi (thr_*), appresi su y (logreg_*, lgbm_*) e
+# compare_* (CompareConfidence, M06). Non ci sono ridge_*, lgbmreg_* e bayes_* (nota N16).
 gate:
-  reliability: empirical         # empirical | beta (Beta-Binomiale, src/cascade/gate/bayes.py)
-  reliability_alpha: 1.0         # smoothing di Laplace della precisione per classe (empirical)
-  # Beta-Binomiale: prior dalla confusione del paper CamFormer (classi equiprobabili) se il file
-  # esiste (TODO: compilarlo dalla figura del paper), altrimenti l'accuratezza del paper (71,3%).
-  beta_n0: 20                    # pseudo-osservazioni del prior
-  beta_q: 0.1                    # 10° percentile della posterior come feature in più
-  prior_confusion: "{repo}/configs/priors/camformer_confusion.csv"
+  reliability_alpha: 1.0         # smoothing di Laplace della precisione per classe (feature B)
   emb_pca_dim: 16
-  models: [always_L0, always_L1, random, thr_maxprob, thr_entropy, thr_margin,
-           logreg_A, logreg_AB, logreg_ABC, logreg_ABC+emb, lgbm_ABC, ridge_ABC, oracle]
-  # RQ2: il gate che usa la traiettoria (moto, embedding) predice quando servono i pixel
-  # meglio della sola confidenza di CamFormer, a parità di costo? Differenze A − B appaiate
-  # (stessi ricampionamenti per take) su area, accuratezza a budget e quota dell'oracolo.
+  models: [always_L0, always_L1, random, oracle,
+           thr_maxprob, thr_margin, thr_entropy,
+           logreg_A, logreg_AC, logreg_ABC, lgbm_ABC,
+           compare_A, compare_AC]
+  # RQ2: il gate che usa la traiettoria predice quando servono i pixel meglio della sola
+  # confidenza di CamFormer, a parità di costo? Differenze A − B appaiate (stessi
+  # ricampionamenti per take) su area, accuratezza a budget e quota dell'oracolo.
+  # Le prime due coppie sono quelle di RQ2: compare_A contro thr_maxprob isola l'effetto di
+  # modellare l'esperto; compare_AC contro compare_A isola l'effetto della traiettoria (tra i
+  # due cambia solo il gruppo C). La terza ripete l'effetto della traiettoria nella famiglia y.
   comparisons:
-    - [logreg_ABC, logreg_A]
-    - [logreg_ABC+emb, logreg_A]
-    - [lgbm_ABC, logreg_A]
-    - [logreg_ABC, thr_maxprob]
-    - [logreg_AB, logreg_A]
-    - [ridge_ABC, logreg_ABC]      # etichetta soft vs etichetta rara (B6)
+    - [compare_A, thr_maxprob]
+    - [compare_AC, compare_A]
+    - [logreg_AC, logreg_A]
   reference: []                  # gate per la cascata nelle tabelle per classe (vuoto = migliore su val)
   logreg_Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
   logreg_inner_cv: 3
   logreg_class_weight: balanced  # y = 1 è raro: pesi bilanciati (ablation: configs/ablations/gate_weights.yaml)
-  ridge_alphas: [0.1, 1.0, 10.0, 100.0]   # ridge_* sull'etichetta soft (B6)
   lgbm:
     num_leaves: 15
     min_child_samples: 20        # = min_data_in_leaf

@@ -66,3 +66,10 @@ def test_new_sections_have_defaults():
         and cfg.paths.split_sha256 == "c9f4e3083f57b099ef9693a5fa57b2f8666bddb6f4377834a7d015e2c7e0344d"
     )
     assert load_config(synthetic=True).folds.group_by == "take"
+
+
+def test_removed_gate_fields_are_unknown():
+    """M06: beta_*, prior_confusion, reliability e ridge_alphas non esistono più (nota N16)."""
+    for key in ("beta_n0", "beta_q", "prior_confusion", "reliability", "ridge_alphas"):
+        with pytest.raises(KeyError):
+            config_from_dict({"gate": {key: 1}})

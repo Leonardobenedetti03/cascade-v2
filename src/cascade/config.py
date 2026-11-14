@@ -217,17 +217,12 @@ class CompareCfg:
 
 @dataclass
 class GateCfg:
-    reliability: str = "empirical"  # empirical | beta
     reliability_alpha: float = 1.0
-    beta_n0: float = 20.0  # pseudo-osservazioni del prior Beta
-    beta_q: float = 0.1  # quantile della posterior (10° percentile)
-    prior_confusion: Optional[str] = "{repo}/configs/priors/camformer_confusion.csv"
     emb_pca_dim: int = 16
     models: List[str] = field(default_factory=list)
     logreg_Cs: List[float] = field(default_factory=lambda: [0.01, 0.1, 1.0, 10.0])
     logreg_inner_cv: int = 3
     logreg_class_weight: str = "balanced"  # balanced | none
-    ridge_alphas: List[float] = field(default_factory=lambda: [0.1, 1.0, 10.0, 100.0])
     lgbm: Dict[str, Any] = field(default_factory=dict)
     random_seeds: int = 10
     seeds: List[int] = field(default_factory=lambda: [0, 1, 2])
@@ -454,10 +449,7 @@ def validate_config(cfg: Config) -> None:
     if not 0 < cfg.fusion.w_grid_step <= 1:
         e.append("fusion.w_grid_step in (0, 1]")
     _one_of(e, "cost.counter", cfg.cost.counter, ["fvcore", "torch", "analytic"])
-    _one_of(e, "gate.reliability", g.reliability, ["empirical", "beta"])
     _one_of(e, "gate.logreg_class_weight", g.logreg_class_weight, ["balanced", "none"])
-    if g.beta_n0 <= 0 or not 0 < g.beta_q < 1:
-        e.append("gate.beta_n0 > 0 e gate.beta_q in (0, 1)")
     if not all(0 < b <= 1 for b in g.budgets) or not 0 < g.operating_budget <= 1:
         e.append("gate.budgets e gate.operating_budget in (0, 1]")
     if not 1 <= g.r_step <= 100:
