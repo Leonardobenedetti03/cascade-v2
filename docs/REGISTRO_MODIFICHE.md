@@ -18,7 +18,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | fe15eb0 (C07a), 31714af (C07b) |
 | M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | 4d55e67 (C12b); 52546c7 (C12c) |
 | M10 | Costo end-to-end e sensibilità al costo delle pose | Solo GMACs e latenza dei modelli | I GMACs non misurano decodifica e camera | f7e6325 (C10) |
-| M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | previsto C13 |
+| M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | 9bbe819 (C13a) |
 | M12 | Estensioni non portate: streaming, keystep, fine-tuning di L1, gate bayesiano | Presenti nel codice | Fuori dalle RQ; restano nella v1 | 41b0f62 (C04), ca2154f (C08b) |
 | M13 | Baseline a un frame eseguita; tre livelli come analisi secondaria | Codice presente, mai eseguito | Senza, il confronto sul costo è incompleto | previsto C08 |
 | M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | 4d55e67 (C12b); 52546c7 (C12c) |
@@ -194,3 +194,28 @@ Il commit di C12b (4d55e67) è entrato nelle righe M09 e M14 della tabella con C
   `TODO(HPC)` di `base.yaml` (pattern dei percorsi, `pose_roots`, `alignment.mode`, `vertical_axis`) si chiudono con la
   prova `dbg_smoke` e con lo stadio 15; `tests/test_hpc_dryrun.py` esenta `55_report.py` finché non esiste (C13b).
 - L'hash di C12c (`52546c7`) è ora in M02, M09 e M14; quello di C13a entra in M11 con il commit successivo.
+
+**N21 — C14a: correzioni bloccanti dell'audit di Giorgio (15/11).** Verificate sul codice prima di correggerle.
+- B1: con `data.traj_source: converted_npz` (la run `site_v2`) l'inventario cercava la traiettoria in
+  `paths.traj_pattern`, cioè il CSV di Aria, e non trovava i `.npz` dello stadio 01: tutte le take sarebbero finite
+  in `missing_takes.csv`. Ora `clips.resolve_take_paths` usa `<paths.traj_dir>/<take_name>.npz`; `traj_pattern`
+  resta per `aria_csv`. Il test di M08 metteva a mano l'override di `traj_pattern` e così nascondeva il bug: tolto,
+  il test fallisce col codice vecchio e passa col nuovo. `data.traj_source` e `paths.traj_dir` entrano nelle chiavi
+  del manifest dello stadio 00.
+- B2: in `hpc/pipeline.sh` gli stadi 15 e 41 partivano dopo lo stadio 01, ma leggono `data/clips.csv` dello stadio
+  00: ora dipendono da `$j00`; il 41 anche da `$j40`, perché scrive `breakeven_pose_gmacs` solo se
+  `40_cost/<hz>/cost.json` esiste già (trovato da Giorgio). Aggiornato `tests/test_hpc_dryrun.py`.
+- B3: `paths.pose_roots` vuoto non era controllato prima della run. `src/cascade/hpc_check.py` (quindi
+  `hpc/check_cluster.sh`), con `converted_npz`, dà FALLITO se la lista è vuota o se una radice non ha
+  `split_manifest.csv`. `takes.json` mancante resta un avviso, come concordato: la v1 sul cluster girava senza (N5)
+  e la durata ripiega sul video. È un errore solo con `alignment.mode: device_us`, dove gli start in µs stanno
+  soltanto lì (prima `hpc_check` dava sempre FALLITO e lo stadio 00 sempre un avviso).
+  `pose_roots` in `base.yaml` resta un `TODO(HPC)`.
+- I6: `cost.expected.camformer` da 0,02 a 0,12 GMACs. Con l'architettura di `base.yaml` e il contesto di 8 s a 20 Hz
+  (T = 160 più il token di gravità) la formula analitica dà 0,1216 GMACs, lo stesso valore di
+  `cost.override_gmacs.L0` dei sintetici; con 0,02 il sanity check dello stadio 40 avrebbe segnalato uno scarto di
+  6× su un conteggio corretto. Un test lega il valore atteso alla formula.
+- Fonte: PDF di Giorgio del 15/11. La sua `correzioni_provate_v2.patch` non era disponibile: le modifiche sono
+  scritte da capo e vanno confrontate con la patch. B4 (stadio 55) non ha una soluzione temporanea: arriva con
+  C13b, prima della run vera.
+- Restano per C14b: I1, I2, I3, I4, I7, m1, m3, m4, m5.

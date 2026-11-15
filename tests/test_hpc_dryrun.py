@@ -231,13 +231,13 @@ def test_pipeline_chain(sandbox):
     assert by["00"][0].deps == {one["01"]}
     assert by["05"][0].deps == {one["00"]}
     assert by["10"][0].deps == {one["00"]}
-    assert by["15"][0].deps == {one["01"]}
+    assert by["15"][0].deps == {one["00"]}  # B2: legge data/clips.csv
     assert by["25"][0].deps == {one["10"]}
     assert by["27"][0].deps == {one["25"], one["05"]}
     assert by["28"][0].deps == {one["10"], one["05"]}
     assert by["30"][0].deps == {one["25"], one["05"]}
     assert by["40"][0].deps == {one["00"]}
-    assert by["41"][0].deps == {one["01"]}
+    assert by["41"][0].deps == {one["00"], one["40"]}  # B2: legge clips.csv (00) e cost.json (40)
     # per seed: 20 → 35 → 45 → 50
     for i, seed in enumerate(("0", "1")):
         assert by["20"][i].args == f"--set camformer.seed={seed}" and by["20"][i].opts["array"] == "0-5"

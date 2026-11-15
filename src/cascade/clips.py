@@ -137,7 +137,12 @@ def resolve_take_paths(ctx, take_name: str) -> Tuple[Path, Path]:
         matches = sorted(base.glob(Path(pattern).name)) if base.exists() else []
         if matches:
             video = matches[0]
-    traj = ctx.path(p.traj_pattern, takes_root=takes_root, take_name=take_name)
+    if ctx.cfg.data.traj_source == "converted_npz":
+        # M08: l'uscita dello stadio 01 sta in paths.traj_dir, un <take_name>.npz per take.
+        # paths.traj_pattern resta il CSV di Aria (sorgente aria_csv) e qui non va usato.
+        traj = ctx.path(p.traj_dir) / f"{take_name}.npz"
+    else:
+        traj = ctx.path(p.traj_pattern, takes_root=takes_root, take_name=take_name)
     return video, traj
 
 
@@ -150,8 +155,12 @@ def build_inventory(ctx) -> Tuple[pd.DataFrame, pd.DataFrame, dict]:
     meta: Dict[str, dict] = {}
     if meta_path.exists():
         meta = load_takes_metadata(meta_path)
+    elif cfg.alignment.mode == "device_us":
+        # gli start in µs stanno solo in takes.json: senza, ogni take sarebbe no_timesync
+        raise FileNotFoundError(f"metadati delle take non trovati: {meta_path} (servono con alignment.mode=device_us)")
     else:
-        log.warning("metadati delle take non trovati: %s", meta_path)
+        # la durata ripiega sul video (_take_duration), come nella v1 sul cluster (N5)
+        log.warning("metadati delle take non trovati: %s (durata dal video)", meta_path)
 
     rows, missing = [], []
     need_sync = cfg.alignment.mode == "device_us"

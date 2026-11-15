@@ -81,3 +81,15 @@ def test_relative_cost():
     assert relative_cost(25.0, 100.0) == pytest.approx(0.25)
     with pytest.raises(ValueError):
         relative_cost(1.0, 0.0)
+
+
+def test_expected_camformer_matches_base_arch():
+    """I6: cost.expected.camformer di base.yaml coerente con l'architettura e il contesto reali."""
+    from src.cascade.config import load_config
+    from src.cascade.cost import camformer_macs
+
+    cfg = load_config()
+    T = int(round((cfg.camformer.context_s or cfg.data.window_s) * cfg.data.traj_fps))
+    analytic = camformer_macs(T, cfg.camformer.arch, 8) / 1e9
+    ratio = analytic / cfg.cost.expected["camformer"]
+    assert 0.9 <= ratio <= 1.1, (analytic, cfg.cost.expected["camformer"])

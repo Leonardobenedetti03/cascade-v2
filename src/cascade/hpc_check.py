@@ -19,6 +19,7 @@ from typing import List, NamedTuple, Optional, Sequence
 
 from src.cascade import paths
 from src.cascade.config import Config, load_config
+from src.cascade.traj_convert import POSE_MANIFEST
 
 OK, WARN, FAIL = "ok", "warn", "fail"
 _LABEL = {OK: "ok        ", WARN: "attenzione", FAIL: "FALLITO   "}
@@ -59,6 +60,21 @@ def _scenario_checks(cfg: Config, scenario: Path, takes_root: Path) -> List[Chec
     return out
 
 
+def _pose_root_checks(roots: List[Path]) -> List[Check]:
+    """Radici delle pose per lo stadio 01 (M08): ognuna con ``split_manifest.csv`` (B3)."""
+    if not roots:
+        return [Check("radici delle pose", FAIL, "paths.pose_roots è vuoto (TODO(HPC)): lo stadio 01 si fermerebbe")]
+    out = []
+    for i, root in enumerate(roots):
+        mf = root / POSE_MANIFEST
+        out.append(
+            _file(f"radice delle pose {i}", mf)
+            if root.is_dir()
+            else Check(f"radice delle pose {i}", FAIL, f"manca la cartella {root}")
+        )
+    return out
+
+
 def path_checks(cfg: Config, run_name: str) -> List[Check]:
     """Verifica i file indispensabili per ``run_name`` con la config ``cfg``."""
     data, run = paths.data_root(), paths.run_dir(run_name)
@@ -67,7 +83,13 @@ def path_checks(cfg: Config, run_name: str) -> List[Check]:
         return paths.resolve(template, data=data, run=run, run_name=run_name)
 
     p = cfg.paths
-    out = [_file("takes.json", res(p.takes_json))]
+    tj = res(p.takes_json)
+    if tj.is_file():
+        out = [Check("takes.json", OK, str(tj))]
+    elif cfg.alignment.mode == "device_us":
+        out = [Check("takes.json", FAIL, f"manca {tj}: serve con alignment.mode=device_us")]
+    else:
+        out = [Check("takes.json", WARN, f"manca {tj}: lo stadio 00 prende la durata dal video (N5)")]
     takes_root = res(p.takes_root)
     out.append(Check("cartella delle take", OK if takes_root.is_dir() else FAIL, str(takes_root)))
     if cfg.egovlp.pretrained:
@@ -76,6 +98,8 @@ def path_checks(cfg: Config, run_name: str) -> List[Check]:
         out.append(_file("pesi CamFormer", res(p.camformer_ckpt)))
     if cfg.frame_baseline.enabled and cfg.frame_baseline.pretrained:
         out.append(_file("pesi MobileNetV3-Small", res(p.frame_baseline_ckpt)))
+    if cfg.data.traj_source == "converted_npz":
+        out += _pose_root_checks([res(r) for r in p.pose_roots])
     scenario = res(p.scenario_csv)
     out.append(_file("split per sito (CSV)", scenario))
     if scenario.is_file():

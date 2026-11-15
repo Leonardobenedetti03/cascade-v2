@@ -39,6 +39,8 @@ STAGE_KEYS: Dict[str, List[str]] = {
         "paths.video_pattern",
         "paths.video_glob",
         "paths.traj_pattern",
+        "paths.traj_dir",
+        "data.traj_source",
         "data.window_s",
         "data.n_windows",
         "data.window_stride_s",

@@ -104,7 +104,9 @@ cost:
   # torch.utils.flop_counter e la formula analitica come controllo: fvcore | torch | analytic.
   counter: fvcore
   device: auto
-  expected: {camformer: 0.02, timesformer_4f: 90.0}   # sanity check, ordine di grandezza
+  # sanity check, ordine di grandezza. CamFormer: arch di base, contesto 8 s a 20 Hz (T=160) + token di
+  # gravità = 0,1216 GMACs (formula analitica, I6; 0,02 era il valore a contesto corto).
+  expected: {camformer: 0.12, timesformer_4f: 90.0}
 
 # Diagnostiche di sito (stadio 27, M02): sonda lineare sulle CLS di L1, solo train e val.
 site_diag:

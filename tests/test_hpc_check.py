@@ -13,6 +13,12 @@ from src.cascade.config import load_config
 from src.cascade.hpc_check import FAIL, OK, WARN, main, path_checks
 
 SITE_V2 = REPO_ROOT / "configs" / "hpc" / "site_v2.yaml"
+# paths.pose_roots è ancora TODO(HPC) in base.yaml: nei test punta a una radice finta
+POSES = ['paths.pose_roots=["{data}/poses"]']
+
+
+def _cfg(*extra: str):
+    return load_config([SITE_V2], POSES + list(extra))
 
 
 def _take_names() -> list:
@@ -29,7 +35,11 @@ def data_tree(tmp_path: Path, monkeypatch) -> Path:
     (data / "egoexo4d" / "takes.json").write_text("[]")
     for name in _take_names():
         (data / "egoexo4d" / "takes" / name).mkdir(parents=True)
-    for rel in ("checkpoints/egovlp/egovlp.pth", "checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth"):
+    for rel in (
+        "checkpoints/egovlp/egovlp.pth",
+        "checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth",
+        "poses/split_manifest.csv",
+    ):
         f = data / rel
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(b"x")
@@ -66,7 +76,7 @@ def test_site_v2_overrides_only_what_differs_from_base():
 
 
 def test_all_present(data_tree):
-    checks = path_checks(load_config([SITE_V2]), "site_v2")
+    checks = path_checks(_cfg(), "site_v2")
     assert all(c.status == OK for c in checks), [c for c in checks if c.status != OK]
     names = {c.name for c in checks}
     assert {"takes.json", "pesi EgoVLP", "pesi MobileNetV3-Small", "hash dello split", "take sul disco"} <= names
@@ -75,20 +85,20 @@ def test_all_present(data_tree):
 
 def test_missing_weights_fail(data_tree):
     (data_tree / "checkpoints" / "egovlp" / "egovlp.pth").unlink()
-    st = _status(path_checks(load_config([SITE_V2]), "site_v2"))
+    st = _status(path_checks(_cfg(), "site_v2"))
     assert st["pesi EgoVLP"] == FAIL and st["pesi MobileNetV3-Small"] == OK
 
 
 def test_camformer_weights_only_when_pretrained(data_tree):
-    cfg = load_config([SITE_V2], ["camformer.pretrained=true"])
+    cfg = _cfg("camformer.pretrained=true")
     st = _status(path_checks(cfg, "site_v2"))
     assert st["pesi CamFormer"] == FAIL
 
 
 def test_split_hash_mismatch_fails(data_tree):
-    cfg = load_config([SITE_V2], ["paths.split_sha256=" + "0" * 64])
+    cfg = _cfg("paths.split_sha256=" + "0" * 64)
     assert _status(path_checks(cfg, "site_v2"))["hash dello split"] == FAIL
-    cfg = load_config([SITE_V2], ["paths.split_sha256=null"])
+    cfg = _cfg("paths.split_sha256=null")
     assert _status(path_checks(cfg, "site_v2"))["hash dello split"] == WARN
 
 
@@ -97,15 +107,39 @@ def test_takes_partial_warns_none_fails(data_tree):
     names = _take_names()
     for name in names[1:]:
         (takes / name).rmdir()
-    assert _status(path_checks(load_config([SITE_V2]), "site_v2"))["take sul disco"] == WARN
+    assert _status(path_checks(_cfg(), "site_v2"))["take sul disco"] == WARN
     (takes / names[0]).rmdir()
-    assert _status(path_checks(load_config([SITE_V2]), "site_v2"))["take sul disco"] == FAIL
+    assert _status(path_checks(_cfg(), "site_v2"))["take sul disco"] == FAIL
 
 
 def test_main_exit_codes(data_tree, capsys):
-    args = ["--config", str(SITE_V2)]
+    args = ["--config", str(SITE_V2), "--set", POSES[0]]
     assert main(args) == 0
     assert "pesi EgoVLP" in capsys.readouterr().out
     (data_tree / "egoexo4d" / "takes.json").unlink()
+    assert main(args) == 0  # takes.json mancante: solo un avviso (N5, durata dal video)
+    assert "attenzione takes.json" in capsys.readouterr().out
+    (data_tree / "checkpoints" / "egovlp" / "egovlp.pth").unlink()
     assert main(args) == 1
     assert "FALLITO" in capsys.readouterr().out
+
+
+def test_takes_json_required_only_with_device_us(data_tree):
+    (data_tree / "egoexo4d" / "takes.json").unlink()
+    assert _status(path_checks(_cfg(), "site_v2"))["takes.json"] == WARN
+    assert _status(path_checks(_cfg("alignment.mode=device_us"), "site_v2"))["takes.json"] == FAIL
+
+
+def test_pose_roots_empty_or_without_manifest_fail(data_tree):
+    """B3: con traj_source=converted_npz le radici delle pose sono indispensabili (stadio 01)."""
+    st = _status(path_checks(load_config([SITE_V2]), "site_v2"))  # pose_roots vuoto, come in base.yaml
+    assert st["radici delle pose"] == FAIL
+    (data_tree / "poses" / "split_manifest.csv").unlink()
+    assert _status(path_checks(_cfg(), "site_v2"))["radice delle pose 0"] == FAIL
+    st = _status(path_checks(_cfg('paths.pose_roots=["{data}/poses", "{data}/altrove"]'), "site_v2"))
+    assert st["radice delle pose 1"] == FAIL
+
+
+def test_pose_roots_ignored_with_aria_csv(data_tree):
+    names = {c.name for c in path_checks(load_config([SITE_V2], ["data.traj_source=aria_csv"]), "site_v2")}
+    assert not any(n.startswith("radic") for n in names)

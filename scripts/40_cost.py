@@ -6,7 +6,7 @@ Scopo:
     CamFormer sul contesto (camformer.context_s, o la finestra) a data.traj_fps più il
     token di gravità; TimeSformer-EgoVLP a 4 frame 224 px (e cost.timesformer_frames,
     es. 8 e 16). Latenza media sul device disponibile (GPU se c'è).
-    Valori attesi come sanity check (cost.expected): CamFormer ~0,02 GMACs,
+    Valori attesi come sanity check (cost.expected): CamFormer ~0,12 GMACs (8 s a 20 Hz),
     TimeSformer-B 4×224 ~90 GMACs; uno scarto > 3× viene segnalato nel log.
 
 Input:

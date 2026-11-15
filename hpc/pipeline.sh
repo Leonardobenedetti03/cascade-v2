@@ -22,14 +22,14 @@ j00=$(sub A 00 --after "$j01")
 j05=$(sub A   05 --after "$j00")
 # B - frame (array CPU), feature di L1 (GPU), diagnostica dell'allineamento
 j10=$(sub B10 10 --after "$j00")
-sub B15 15 --after "$j01" > /dev/null      # diagnostico: non blocca la catena
+sub B15 15 --after "$j00" > /dev/null      # diagnostico (legge data/clips.csv): non blocca la catena
 j25=$(sub B25 25 --after "$j10")
 # C - stadi che non dipendono dal seed di CamFormer
 j27=$(sub C   27 --after "$j25:$j05")
 j28=$(sub C   28 --after "$j10:$j05")
 j30=$(sub C   30 --after "$j25:$j05")
 j40=$(sub C   40 --after "$j00")
-j41=$(sub C   41 --after "$j01")
+j41=$(sub C   41 --after "$j00:$j40")   # legge data/clips.csv (00) e cost.json (40)
 # B20 + C per seed: CamFormer (array 0-5), fusione, cache, gate su val
 dep50=""
 read -r -a SEED_LIST <<< "$SEEDS"
