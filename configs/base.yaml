@@ -9,21 +9,22 @@ seed: 0
 paths:
   scenario_csv: "{repo}/splits/site_v1/scenario_site.csv"
   split_sha256: "c9f4e3083f57b099ef9693a5fa57b2f8666bddb6f4377834a7d015e2c7e0344d"  # SHA256 di scenario_csv: entra nei manifest (M07)
-  takes_json: "{data}/egoexo4d/takes.json"                       # TODO(HPC)
-  takes_root: "{data}/egoexo4d/takes"                            # TODO(HPC)
-  # Stream RGB degli occhiali Aria, versione 448 px. TODO(HPC): verificare il nome.
+  takes_json: "{data}/egoexo4d/takes.json"                       # assente sul cluster: site_v2 usa la durata del video (N23)
+  takes_root: "{data}/egoexo4d/takes"                            # sul cluster: link alle due metà del subset (N23)
+  # Stream RGB degli occhiali Aria, versione 448 px. Sul cluster il prefisso varia (aria01, aria02, aria, aria1):
+  # una sola *214-1*.mp4 per take, trovata da video_glob (N23).
   video_pattern: "{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/aria01_214-1.mp4"
   video_glob: "{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/*214-1*.mp4"
-  traj_pattern: "{takes_root}/{take_name}/trajectory/closed_loop_trajectory.csv"   # TODO(HPC)
+  traj_pattern: "{takes_root}/{take_name}/trajectory/closed_loop_trajectory.csv"   # solo traj_source=aria_csv
   camformer_npz_dir: "{data}/camformer/egoexo4d_pretrain"        # solo traj_source=camformer_npz
   camformer_ckpt: "{data}/checkpoints/camformer/egoexo4d_dur8.pt"
   egovlp_ckpt: "{data}/checkpoints/egovlp/egovlp.pth"            # EgoVLP_PT_BEST
-  # pesi torchvision IMAGENET1K_V1 di mobilenet_v3_small (baseline un frame). TODO(HPC)
+  # pesi torchvision IMAGENET1K_V1 di mobilenet_v3_small (baseline un frame), scaricati sul login node (N23)
   frame_baseline_ckpt: "{data}/checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth"
   frames_dir: "{data}/frames/{run_name}"                         # persistente, fuori dalla run (era {run}/10_frames)
   traj_cache_dir: "{run}/traj_cache"
   traj_dir: "{run}/01_traj"                                      # uscita dello stadio 01 (M08): un <take_name>.npz per take
-  pose_roots: []                                                 # TODO(HPC): radici con split_manifest.csv e annotations/ego_pose (v1: due)
+  pose_roots: []                                                 # radici con split_manifest.csv: quelle vere in configs/hpc/site_v2.yaml (N23)
 
 data:
   window_s: 8.0              # durata D della clip; ablation 4 / 16

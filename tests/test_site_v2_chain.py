@@ -18,7 +18,12 @@ pytest.importorskip("torch")
 
 SITE_V2 = str(REPO_ROOT / "configs" / "hpc" / "site_v2.yaml")
 # Solo ciò che i sintetici non possono avere uguale alla run vera.
-SYNTHETIC_ONLY = ["alignment.mode=same_origin", "data.max_missing_frac=0.1", "folds.group_by=take"]
+SYNTHETIC_ONLY = [
+    "alignment.mode=same_origin",
+    "data.max_missing_frac=0.1",
+    "folds.group_by=take",
+    'paths.pose_roots=["{data}"]',  # site_v2.yaml ha le radici del cluster (N23)
+]
 
 
 def _run(script, argv):

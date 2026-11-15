@@ -237,3 +237,33 @@ applicata dove non coincideva già con C14a; ogni test nuovo fallisce col codice
   take, perché i sintetici hanno un solo sito). `tests/test_hpc_dryrun.py` ricava le dipendenze di `pipeline.sh` da
   ciò che ogni script legge: è il test che ha trovato la dipendenza 41 → 40.
 - Restano per la seconda parte di C14b: I3 (bootstrap e confronti sul train, metrica per fold), I7, m1, m3, m4, m5.
+
+**N23 — C14c, prima parte: valori del cluster e percorsi veri (ricognizione del 15/11 in sola lettura).**
+Verificati sul login node con `sacctmgr`, `sinfo`, `scontrol`, `sbatch --test-only` (nulla in coda) e `find`; la v1
+(`hpc/*.sbatch`, `hpc/make_traj_data.py`) indicava dove guardare.
+- Cluster: account 3185472, partizione e QOS `stud`. Le GPU sono partizioni MIG (`3g.40gb`, `4g.40gb`, `7g.80gb`):
+  `--gres=gpu:1` è accettato e resta il default (la v1 usava `--gpus=1`, accettato anch'esso). Python 3.9.25 di sistema,
+  rete dal login node verso PyPI, PyTorch e GitHub: `MODULES` vuoto, torch `cu121`. I valori stanno in
+  `hpc/env.local.sh` (non versionato) e, per memoria, in `docs/RUNBOOK_HPC.md`.
+- `paths.pose_roots`: le due metà del subset, `/home/3185472/egoexo4d_split_45G_physical` (992 take) e
+  `/home/3218863/Oasis_Deep_Vision_DSBA/egoexo4d_split_45G` (281), ognuna con `split_manifest.csv` e
+  `annotations/ego_pose/{train,val}`. 992 + 281 = 1273 = 1138 + 68 + 67, e l'elenco coincide con
+  `splits/site_v1/scenario_site.csv`. I due manifest hanno colonne diverse; lo stadio 01 legge solo `take_name` e
+  `camera_pose_file`, presenti in entrambi. Le radici vanno in `configs/hpc/site_v2.yaml` e non in `base.yaml`
+  (i sintetici hanno le loro); `tests/test_site_v2_chain.py` le rimette sui sintetici.
+- `takes_root`: il blueprint presuppone una sola cartella con tutte le take, il subset ne ha due. Scelta: riusare
+  l'albero di link costruito in v1 (`/home/3185472/cascade_data/egoexo4d/takes`, 1273 take, 0 link rotti, ogni
+  `frame_aligned_videos` punta alla radice vera), collegato come `$DL4CV_ROOT/data/egoexo4d/takes`. Nelle cartelle
+  ci sono anche i `closed_loop_trajectory.csv` della v1: `site_v2` (`converted_npz`) non li legge. Alternativa
+  scartata per ora: uno script versionato che ricostruisce i link dai manifest (stesso risultato, più lavoro).
+- `video_pattern`: il prefisso dello stream varia (`aria01` 878, `aria02` 102, `aria` 10, `aria1` 2 take nella prima
+  metà); ogni take ha un solo `*214-1*.mp4`, che `video_glob` trova. Invariato.
+- `takes.json` non c'è: `data.duration_source: video` in `site_v2.yaml`, esplicito invece del ripiego silenzioso
+  (come la v1, N5). Con `alignment.mode: device_us` resterebbe un errore di `hpc_check` (B3).
+- Pesi: EgoVLP dal file della v1 (link), MobileNetV3-Small scaricato dal login node (hash `047dcff4` verificato).
+- Chiave GitHub: deploy key di `cascade-v2` in lettura e scrittura, solo sul cluster. Il codice si cambia dal Mac.
+- Aperto (C14c, seconda parte): la QOS `stud` ammette 4 job in coda e 2 in esecuzione per utente, e ogni elemento di
+  un array conta. `hpc/pipeline.sh` ne sottomette circa 20, più gli array degli stadi 10 e 20: SLURM rifiuterebbe il
+  quinto `sbatch`. Va riorganizzato in pochi job con più stadi in sequenza, come faceva la v1 (`chain.sbatch`).
+- Restano `TODO(HPC)` da chiudere con lo stadio 15: `alignment.mode`, `data.vertical_axis`, `frames.rotate_k90`.
+

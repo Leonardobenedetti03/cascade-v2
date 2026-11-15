@@ -2,7 +2,7 @@
 # hpc/env.sh - parametri del cluster e della run. File versionato.
 # I valori personali (account, percorsi con il nome utente) vanno in hpc/env.local.sh,
 # ignorato da git e letto per primo: qui sotto ogni variabile gia' impostata resta com'e'.
-# Ogni TODO(HPC) si compila una volta, al primo accesso (docs/RUNBOOK_HPC.md).
+# Ogni TODO(HPC) si compila una volta, al primo accesso: i valori del cluster Bocconi sono in docs/RUNBOOK_HPC.md (N23).
 _here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$_here/env.local.sh" ]]; then source "$_here/env.local.sh"; fi
 unset _here

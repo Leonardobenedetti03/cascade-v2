@@ -3,9 +3,18 @@
 #   RUN_NAME=site_v2 hpc/pipeline.sh
 run_name: site_v2
 
+paths:
+  # Le due metà del subset sul cluster (N23), ognuna con split_manifest.csv e annotations/ego_pose:
+  # 992 + 281 = 1273 take, le stesse di splits/site_v1/scenario_site.csv.
+  pose_roots:
+    - /home/3185472/egoexo4d_split_45G_physical
+    - /home/3218863/Oasis_Deep_Vision_DSBA/egoexo4d_split_45G
+
 data:
   # Pose convertite dallo stadio 01 (M08). Il default di base.yaml è aria_csv, che serve ai sintetici.
   traj_source: converted_npz
+  # takes.json non c'è sul cluster (N5, N23): la durata della take viene dal video.
+  duration_source: video
 
 # M13: baseline a un frame (stadio 28) e cascata a tre livelli come analisi secondaria.
 frame_baseline:
@@ -15,5 +24,5 @@ egovlp:
   zero_shot:
     enabled: false   # D8: nessun modello di testo, quindi nessun download sui nodi senza rete
 
-# Ancora da verificare sul cluster (TODO(HPC) in base.yaml): pattern dei percorsi (stadio 00 --inspect),
-# alignment.mode (stadio 15), data.vertical_axis (stadio 15), paths.pose_roots.
+# Ancora da verificare sul cluster (TODO(HPC) in base.yaml): alignment.mode, data.vertical_axis e
+# frames.rotate_k90 (stadio 15). Percorsi, pose_roots e takes.json sono chiusi in N23.

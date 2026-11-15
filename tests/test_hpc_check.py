@@ -13,7 +13,7 @@ from src.cascade.config import load_config
 from src.cascade.hpc_check import FAIL, OK, WARN, main, path_checks
 
 SITE_V2 = REPO_ROOT / "configs" / "hpc" / "site_v2.yaml"
-# paths.pose_roots è ancora TODO(HPC) in base.yaml: nei test punta a una radice finta
+# site_v2.yaml ha le radici vere del cluster (N23): nei test punta a una radice finta
 POSES = ['paths.pose_roots=["{data}/poses"]']
 
 
@@ -53,7 +53,8 @@ def _status(checks) -> Dict[str, str]:
 def test_site_v2_config_loads_and_pins_the_run():
     cfg = load_config([SITE_V2])
     assert cfg.run_name == "site_v2"
-    assert cfg.data.traj_source == "converted_npz"
+    assert cfg.data.traj_source == "converted_npz" and cfg.data.duration_source == "video"
+    assert len(cfg.paths.pose_roots) == 2 and all(r.startswith("/home/") for r in cfg.paths.pose_roots)
     assert cfg.frame_baseline.enabled and not cfg.egovlp.zero_shot.enabled
     assert cfg.folds.group_by == "site" and not cfg.camformer.pretrained and cfg.fusion.mode == "replace"
     assert dict(cfg.data.expected_split_counts) == {"train": 1138, "val": 68, "test": 67}
@@ -71,7 +72,13 @@ def test_site_v2_overrides_only_what_differs_from_base():
         for key, val in vals.items()
         if base[sec][key] != val
     )
-    assert changed == ["data.traj_source", "egovlp.zero_shot", "frame_baseline.enabled"]
+    assert changed == [
+        "data.duration_source",
+        "data.traj_source",
+        "egovlp.zero_shot",
+        "frame_baseline.enabled",
+        "paths.pose_roots",
+    ]
     assert run["run_name"] == "site_v2"
 
 
@@ -132,7 +139,7 @@ def test_takes_json_required_only_with_device_us(data_tree):
 
 def test_pose_roots_empty_or_without_manifest_fail(data_tree):
     """B3: con traj_source=converted_npz le radici delle pose sono indispensabili (stadio 01)."""
-    st = _status(path_checks(load_config([SITE_V2]), "site_v2"))  # pose_roots vuoto, come in base.yaml
+    st = _status(path_checks(_cfg("paths.pose_roots=[]"), "site_v2"))  # pose_roots vuoto, come in base.yaml
     assert st["radici delle pose"] == FAIL
     (data_tree / "poses" / "split_manifest.csv").unlink()
     assert _status(path_checks(_cfg(), "site_v2"))["radice delle pose 0"] == FAIL
