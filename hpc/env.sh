@@ -9,6 +9,7 @@ unset _here
 
 # --- cluster ---------------------------------------------------------------------------
 export SLURM_ACCOUNT="${SLURM_ACCOUNT:-}"   # TODO(HPC) sacctmgr show assoc user=$USER format=account,partition,qos
+export SLURM_QOS="${SLURM_QOS:-}"           # TODO(HPC) solo se il cluster richiede una QOS (sacctmgr, colonna qos)
 export CPU_PARTITION="${CPU_PARTITION:-}"   # TODO(HPC) sinfo -s
 export GPU_PARTITION="${GPU_PARTITION:-}"   # TODO(HPC) sinfo -s
 export GPU_GRES="${GPU_GRES:-gpu:1}"        # TODO(HPC) sinfo -o "%P %G"   (es. gpu:a100:1)

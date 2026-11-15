@@ -20,7 +20,7 @@ echo "1. un solo commit nei manifest degli stadi 00-52, uguale al clone"
 COMMITS=$(python3 - "$RUN_DIR" <<'PY'
 import json, pathlib, sys
 ms = sorted(pathlib.Path(sys.argv[1], "_manifest").glob("*.json"))
-ms = [m for m in ms if not m.name.startswith("55_")]      # il report si puo' rigenerare dopo
+ms = [m for m in ms if not m.name.startswith("55_")]      # il report si puo rigenerare dopo
 print(" ".join(sorted({str(json.loads(m.read_text()).get("commit", "unknown")) for m in ms})))
 PY
 )

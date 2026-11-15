@@ -21,5 +21,6 @@ sha256sum < "$VENV/pip_freeze.txt" | cut -d' ' -f1 > "$VENV/pip_freeze.sha256"
 { module list 2>&1 || true; } > "$VENV/modules.txt"
 
 python -c "import torch; print('torch', torch.__version__, 'cuda build', torch.version.cuda)"
+python -c "import transformers; print('transformers', transformers.__version__)"
 python -m pytest -q          # la suite deve passare anche sul cluster
 echo "ambiente pronto: $VENV (hash $(cut -c1-16 "$VENV/pip_freeze.sha256"))"

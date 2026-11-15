@@ -9,19 +9,19 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | ID | Che cosa cambia | Prima (v1) | Perché | Commit |
 |----|-----------------|------------|--------|--------|
 | M01 | Repository nuovo, codice portato selettivamente | Estensioni non usate e script di lancio fuori dal repository | Il codice consegnato è quello che produce i risultati | 9c9147d (C01) … |
-| M02 | Split per sito: test georgiatech, val nus + fair | Split ufficiali per take | L1 al 99% riconosce in parte il laboratorio; leave-one-site-out 61,7%; criteri fissati prima dei risultati | v1 3d5f3b4; v2 88384ba; stadio 27 in C12c (hash in C13) |
+| M02 | Split per sito: test georgiatech, val nus + fair | Split ufficiali per take | L1 al 99% riconosce in parte il laboratorio; leave-one-site-out 61,7%; criteri fissati prima dei risultati | v1 3d5f3b4; v2 88384ba; stadio 27 52546c7 (C12c) |
 | M03 | Fold di train per sito | Fold per take | Le predizioni fuori campione devono simulare lo spostamento verso siti nuovi | 88384ba (C06) |
 | M04 | CamFormer da zero | Checkpoint pubblico come default | Il pretraining ha visto circa il 95% di train e val | d134b40 (C08a) |
 | M05 | Fusione `replace` di default | Fusione log-lineare | Δ = 0,0 nella v1; gli ensemble non migliorano il fronte; L1 diventa l'esperto | aefe79b (C09) |
 | M06 | Gate per famiglie, CompareConfidence | Più di 15 gate senza riferimento | RQ2 tra famiglie citabili; la traiettoria è l'unica variabile tra `compare_A` e `compare_AC` | 9b9b0fb (C11) |
 | M07 | Manifest con chiavi di split e fold | Cambio di fold non rilevato a valle | Impedisce di riusare in silenzio output calcolati con fold diverse | 1d8dd17 (C05) |
 | M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | fe15eb0 (C07a), 31714af (C07b) |
-| M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | 4d55e67 (C12b); C12c (hash in C13) |
+| M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | 4d55e67 (C12b); 52546c7 (C12c) |
 | M10 | Costo end-to-end e sensibilità al costo delle pose | Solo GMACs e latenza dei modelli | I GMACs non misurano decodifica e camera | f7e6325 (C10) |
 | M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | previsto C13 |
 | M12 | Estensioni non portate: streaming, keystep, fine-tuning di L1, gate bayesiano | Presenti nel codice | Fuori dalle RQ; restano nella v1 | 41b0f62 (C04), ca2154f (C08b) |
 | M13 | Baseline a un frame eseguita; tre livelli come analisi secondaria | Codice presente, mai eseguito | Senza, il confronto sul costo è incompleto | previsto C08 |
-| M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | 4d55e67 (C12b); C12c (hash in C13) |
+| M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | 4d55e67 (C12b); 52546c7 (C12c) |
 | M15 | Epoche e patience di CamFormer (D3) | 30 epoche, patience 5 | Fold 0 e full al tetto con la perdita in calo | d134b40 (C08a) |
 | M16 | `results/` nel repository | Risultati solo sull'HPC e in un backup | Ogni numero del report ha run e commit | previsto dopo le run |
 
@@ -173,3 +173,24 @@ Il commit di C12b (4d55e67) è entrato nelle righe M09 e M14 della tabella con C
   cascata a tre livelli non è valutata nello stadio 50; il blueprint (11.2) ha `transfer_budgets` da 0,1 a 0,9, la
   config [0,25; 0,5].
 - L'hash di C12c entra in M02, M09 e M14 con il commit successivo (C13), come per gli altri.
+
+**N20 — C13a: lancio sull'HPC.**
+- Tag `results-v1` del repository v1: punta ad `a06691b`, il commit che ha prodotto i 49 manifest, come dice il
+  blueprint. `a5f66f2`, visto con `rev-parse --short`, è l'oggetto del tag annotato e non un commit. Nessuna
+  discrepanza; gli script di lancio della v1 sono in `8a4d9c2`, più recente.
+- `hpc/env.sh` ha `SLURM_QOS` e `hpc/submit.sh` passa `--qos` quando è impostata. I valori personali (account,
+  partizione, QOS) stanno in `hpc/env.local.sh`, fuori dal repository.
+- La tabella degli stadi di `hpc/submit.sh` è una funzione con `case` e non un array associativo: stessi valori, ma
+  gira anche con la bash 3.2 del Mac, quindi `tests/test_hpc_dryrun.py` la prova in locale oltre che in CI.
+- `configs/hpc/site_v2.yaml` contiene solo ciò che distingue la run: il nome, `data.traj_source: converted_npz`
+  (il blueprint 11.2 lo mette in `base.yaml`, che nel codice ha `aria_csv` perché i sintetici lo usano: scelta,
+  `base.yaml` invariato), la baseline a un frame accesa (M13) e lo zero-shot spento (D8: nessun modello di testo da
+  scaricare sui nodi). Un test verifica che le sole chiavi diverse da `base.yaml` siano queste.
+- `hpc/check_cluster.sh` e `src/cascade/hpc_check.py`: controlli sul login node (parametri, import di `torch` e
+  `transformers`, percorsi di dati e pesi, hash dello split, `sbatch --test-only`). `transformers>=4.30` è in
+  `env/requirements.txt` e `hpc/setup_env.sh` ne stampa la versione; che sia importabile sul cluster si vede solo lì.
+- `docs/RUNBOOK_HPC.md`, citato da `hpc/env.sh`, ora esiste.
+- Aperti: `id_v2` non si può lanciare (`splits/id_v1/` ha solo `.gitkeep`; il confronto H4 resta fuori da C13); i
+  `TODO(HPC)` di `base.yaml` (pattern dei percorsi, `pose_roots`, `alignment.mode`, `vertical_axis`) si chiudono con la
+  prova `dbg_smoke` e con lo stadio 15; `tests/test_hpc_dryrun.py` esenta `55_report.py` finché non esiste (C13b).
+- L'hash di C12c (`52546c7`) è ora in M02, M09 e M14; quello di C13a entra in M11 con il commit successivo.

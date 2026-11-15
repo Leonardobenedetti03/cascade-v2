@@ -22,27 +22,31 @@ export STAGE_ARGS="$*"
 
 # stadio -> script, nodo, CPU, memoria, tempo massimo, tipo di array.
 # Valori di partenza (stime): correggerli con i tempi del primo run (sacct).
-declare -A TABLE=(
-  [00]="00_inventory.py              cpu 4 8G  00:30:00 none"
-  [01]="01_convert_trajectories.py   cpu 4 8G  01:00:00 none"
-  [05]="05_folds.py                  cpu 1 4G  00:10:00 none"
-  [10]="10_extract_frames.py         cpu 4 8G  01:00:00 shard"
-  [15]="15_alignment_check.py        cpu 2 8G  00:20:00 none"
-  [20]="20_camformer_finetune.py     gpu 4 16G 01:00:00 fold"
-  [25]="25_egovlp_features.py        gpu 8 32G 01:00:00 none"
-  [27]="27_site_diagnostics.py       cpu 4 16G 00:30:00 none"
-  [28]="28_frame_baseline.py         gpu 4 16G 00:30:00 none"
-  [30]="30_l1_heads.py               cpu 8 16G 00:30:00 none"
-  [35]="35_fusion.py                 cpu 2 8G  00:15:00 none"
-  [40]="40_cost.py                   gpu 2 16G 00:15:00 none"
-  [41]="41_cost_e2e.py               gpu 4 16G 00:45:00 none"
-  [45]="45_build_cache.py            cpu 4 16G 00:30:00 none"
-  [50]="50_gate_eval.py              cpu 8 16G 01:00:00 none"
-  [52]="52_aggregate_seeds.py        cpu 1 4G  00:10:00 none"
-  [55]="55_report.py                 cpu 2 8G  00:20:00 none"
-)
-[[ -n "${TABLE[$STAGE]:-}" ]] || die "stadio sconosciuto: $STAGE"
-read -r SCRIPT KIND CPUS MEM TIME ARRAY <<< "${TABLE[$STAGE]}"
+# (funzione con case e non array associativo: gira anche con la bash 3.2 del Mac, dove si prova)
+stage_row() {
+  case "$1" in
+    00) echo "00_inventory.py              cpu 4 8G  00:30:00 none" ;;
+    01) echo "01_convert_trajectories.py   cpu 4 8G  01:00:00 none" ;;
+    05) echo "05_folds.py                  cpu 1 4G  00:10:00 none" ;;
+    10) echo "10_extract_frames.py         cpu 4 8G  01:00:00 shard" ;;
+    15) echo "15_alignment_check.py        cpu 2 8G  00:20:00 none" ;;
+    20) echo "20_camformer_finetune.py     gpu 4 16G 01:00:00 fold" ;;
+    25) echo "25_egovlp_features.py        gpu 8 32G 01:00:00 none" ;;
+    27) echo "27_site_diagnostics.py       cpu 4 16G 00:30:00 none" ;;
+    28) echo "28_frame_baseline.py         gpu 4 16G 00:30:00 none" ;;
+    30) echo "30_l1_heads.py               cpu 8 16G 00:30:00 none" ;;
+    35) echo "35_fusion.py                 cpu 2 8G  00:15:00 none" ;;
+    40) echo "40_cost.py                   gpu 2 16G 00:15:00 none" ;;
+    41) echo "41_cost_e2e.py               gpu 4 16G 00:45:00 none" ;;
+    45) echo "45_build_cache.py            cpu 4 16G 00:30:00 none" ;;
+    50) echo "50_gate_eval.py              cpu 8 16G 01:00:00 none" ;;
+    52) echo "52_aggregate_seeds.py        cpu 1 4G  00:10:00 none" ;;
+    55) echo "55_report.py                 cpu 2 8G  00:20:00 none" ;;
+    *) return 1 ;;
+  esac
+}
+ROW=$(stage_row "$STAGE") || die "stadio sconosciuto: $STAGE"
+read -r SCRIPT KIND CPUS MEM TIME ARRAY <<< "$ROW"
 export STAGE_SCRIPT="$SCRIPT" ARRAY_KIND="$ARRAY"
 TIME="${TIME_OVERRIDE:-$TIME}"; MEM="${MEM_OVERRIDE:-$MEM}"
 
@@ -63,6 +67,7 @@ else
   OPTS+=(--partition="${CPU_PARTITION:?TODO(HPC) CPU_PARTITION}")
 fi
 if [[ -n "$SLURM_ACCOUNT" ]]; then OPTS+=(--account="$SLURM_ACCOUNT"); fi
+if [[ -n "${SLURM_QOS:-}" ]]; then OPTS+=(--qos="$SLURM_QOS"); fi
 if [[ -n "$AFTER" ]]; then OPTS+=(--dependency="afterok:$AFTER"); fi
 case "$ARRAY" in
   shard) OPTS+=(--array="0-$((NUM_SHARDS - 1))" --output="logs/slurm/%x-%A_%a.out") ;;

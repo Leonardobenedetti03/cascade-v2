@@ -1,0 +1,19 @@
+# Run principale (M02, M03): split per sito, 3 seed di CamFormer.
+# Solo ciò che distingue la run da configs/base.yaml: lanciata con
+#   RUN_NAME=site_v2 hpc/pipeline.sh
+run_name: site_v2
+
+data:
+  # Pose convertite dallo stadio 01 (M08). Il default di base.yaml è aria_csv, che serve ai sintetici.
+  traj_source: converted_npz
+
+# M13: baseline a un frame (stadio 28) e cascata a tre livelli come analisi secondaria.
+frame_baseline:
+  enabled: true
+
+egovlp:
+  zero_shot:
+    enabled: false   # D8: nessun modello di testo, quindi nessun download sui nodi senza rete
+
+# Ancora da verificare sul cluster (TODO(HPC) in base.yaml): pattern dei percorsi (stadio 00 --inspect),
+# alignment.mode (stadio 15), data.vertical_axis (stadio 15), paths.pose_roots.
