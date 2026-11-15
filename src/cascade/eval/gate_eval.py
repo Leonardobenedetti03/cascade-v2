@@ -813,6 +813,8 @@ def evaluate(table, labels, cfg, *, final: bool) -> Dict[str, object]:
             out["escalation_by_class"] += cl
             ref = reference_gate(results, curves_val, gcfg)
             systems = {"L0": sd.p_cam, "L1": sd.p_vid, "fused": sd.p_fused}
+            if "half_probs_cal" in table.arrays:
+                systems["Lhalf"] = table.arrays["half_probs_cal"][sd.rows]
             if ref is not None:
                 esc = escalate_at_operating_point(ref, results[ref][0], thresholds[ref][0], rates.get(ref, 0.0), sd)
                 systems[f"cascade[{ref}]"] = np.where(esc[:, None], sd.p_fused, sd.p_cam)

@@ -126,6 +126,36 @@ SPLIT_DEPENDENT_STAGES = (
 for _stage in SPLIT_DEPENDENT_STAGES:
     STAGE_KEYS[_stage] = STAGE_KEYS[_stage] + [k for k in SPLIT_KEYS if k not in STAGE_KEYS[_stage]]
 
+# [I2] Stesso difetto per la definizione delle clip: rifare lo stadio 00 con un'altra finestra, durata o sorgente
+# delle traiettorie deve invalidare frame, feature, predizioni e cache. Lo stadio 00 prende anche l'hash dello
+# split (un CSV cambiato a parità di nome cambia clips.csv) e il 41 ha finalmente le sue chiavi.
+STAGE_KEYS["00_inventory"].append("paths.split_sha256")
+STAGE_KEYS["41_cost_e2e"] = [
+    "cost_e2e",
+    "cost.device",
+    "frames",
+    "camformer.arch",
+    "camformer.context_s",
+    "egovlp.arch",
+    "egovlp.frame_indices",
+    "data.traj_fps",
+]
+CLIP_KEYS = list(STAGE_KEYS["00_inventory"])
+CLIP_DEPENDENT_STAGES = (
+    "10_frames",
+    "20_camformer",
+    "25_egovlp",
+    "27_site",
+    "28_frame_baseline",
+    "30_l1_heads",
+    "35_fusion",
+    "41_cost_e2e",
+    "45_cache",
+    "50_gate",
+)
+for _stage in CLIP_DEPENDENT_STAGES:
+    STAGE_KEYS[_stage] = STAGE_KEYS[_stage] + [k for k in CLIP_KEYS if k not in STAGE_KEYS[_stage]]
+
 
 class ConfigMismatch(RuntimeError):
     """Output esistenti prodotti con una config diversa da quella attuale."""

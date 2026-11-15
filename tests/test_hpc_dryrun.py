@@ -7,7 +7,9 @@ locale e in CI, senza SLURM. ``stage.sbatch`` non viene eseguito: gira solo sul 
 
 from __future__ import annotations
 
+import ast
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -212,6 +214,48 @@ def test_every_stage_points_to_an_existing_script(sandbox):
         else:
             assert exists, f"hpc/submit.sh punta a scripts/{call.script}, che non esiste"
     assert len(seen) == len(ALL_STAGES)
+
+
+def required_stages(script: str) -> Set[str]:
+    """Numeri degli stadi di cui ``scripts/<script>`` legge l'output: i nomi di stadio che compaiono
+    come stringhe nel sorgente (``ctx.require("00_inventory")``, anche dentro un ciclo), meno il
+    proprio, più lo stadio 00 se lo script chiama ``ctx.read_clips()``."""
+    src = (REPO_ROOT / "scripts" / script).read_text()
+    own = script[:2]
+    names = {
+        n.value[:2]
+        for n in ast.walk(ast.parse(src))
+        if isinstance(n, ast.Constant) and isinstance(n.value, str) and re.fullmatch(r"\d\d_[a-z0-9_]+", n.value)
+    }
+    if "read_clips(" in src:
+        names.add("00")
+    return names - {own}
+
+
+def test_pipeline_dependencies_cover_what_each_stage_reads(sandbox):
+    """Le dipendenze di ``pipeline.sh`` si ricavano da ciò che gli script richiedono, non da una
+    tabella copiata: ogni job deve venire dopo un job di ogni stadio di cui legge l'output."""
+    assert run(sandbox, "hpc/pipeline.sh").returncode == 0
+    calls = read_calls(sandbox)
+    by_id = {c.id: c for c in calls}
+
+    def ancestors(c: Call) -> Set[str]:
+        seen: Set[str] = set()
+        todo = list(c.deps)
+        while todo:
+            j = todo.pop()
+            if j not in seen:
+                seen.add(j)
+                todo += list(by_id[j].deps)
+        return seen
+
+    submitted = {c.stage for c in calls}
+    for c in calls:
+        if c.script in NOT_YET:
+            continue
+        before = {by_id[j].stage for j in ancestors(c)}
+        missing = (required_stages(c.script) & submitted) - before
+        assert not missing, f"lo stadio {c.stage} legge {sorted(missing)} ma non ne dipende in pipeline.sh"
 
 
 def test_pipeline_chain(sandbox):

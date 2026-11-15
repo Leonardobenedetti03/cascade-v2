@@ -170,3 +170,16 @@ def test_scores_frame_is_aligned_with_table(res_final, table):
     s = res_final["scores"]
     assert len(s) == len(table) and (s.clip_id.to_numpy() == table.df.clip_id.to_numpy()).all()
     assert pd.api.types.is_numeric_dtype(s["score__oracle__s0"])
+
+
+def test_lhalf_is_evaluated_when_in_the_cache(labels, cfg):
+    """I4: con la baseline a un frame nella cache, lo stadio 50 riporta anche L½ (riga L½ di T1)."""
+    t = make_mock_cache(labels, 200, 80, 80, 5, 3, cam_dim=8, vid_dim=8)
+    base = pd.DataFrame(evaluate(t, labels, cfg, final=True)["per_class"])
+    assert "Lhalf" not in set(base.system)
+    t.arrays["half_probs_cal"] = t.arrays["vid_probs_cal"].copy()
+    pc = pd.DataFrame(evaluate(t, labels, cfg, final=True)["per_class"])
+    assert {"Lhalf", "L1"} <= set(pc.system) and "test" in set(pc[pc.system == "Lhalf"].split)
+    a = pc[pc.system == "Lhalf"].set_index(["split", "class"]).acc
+    b = pc[pc.system == "L1"].set_index(["split", "class"]).acc
+    pd.testing.assert_series_equal(a, b, check_names=False)  # stesse probabilità, stesse accuratezze

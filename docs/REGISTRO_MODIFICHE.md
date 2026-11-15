@@ -219,3 +219,21 @@ Il commit di C12b (4d55e67) è entrato nelle righe M09 e M14 della tabella con C
   scritte da capo e vanno confrontate con la patch. B4 (stadio 55) non ha una soluzione temporanea: arriva con
   C13b, prima della run vera.
 - Restano per C14b: I1, I2, I3, I4, I7, m1, m3, m4, m5.
+
+**N22 — C14b, prima parte: I1, I2, I4 e il test della config vera (I8).** Da `correzioni_provate_v2.patch` di Giorgio,
+applicata dove non coincideva già con C14a; ogni test nuovo fallisce col codice di prima.
+- I1: in `heads.fit_head` le fold interne si contavano sulle clip e non sulle take, e Bouldering (una take nel fit
+  delle fold 1–4 di `site_v1`) portava `n_splits` a 1: CV saltata e C = 0,001 fisso, senza avviso. Ora le classi con
+  una sola take restano fuori dalla CV interna e dentro il fit finale; se nessuna classe ha due take si usa `Cs[0]` con
+  un avviso. Vale anche per la testa di L½. Test: `tests/test_heads_rare_class.py` (fold versionate, C invariato
+  aggiungendo la take rara, colonne allineate, classe rara imparata).
+- I2: le chiavi dello stadio 00 (`CLIP_KEYS`, ora con `paths.split_sha256`) passano agli stadi 10, 20, 25, 27, 28, 30,
+  35, 41, 45 e 50, come `SPLIT_KEYS` in M07; il 41 ha le sue chiavi. Rifare lo stadio 00 con un'altra definizione delle
+  clip dà `ConfigMismatch` invece di riusare output vecchi. Lo stadio 10 salta comunque i `.npy` già presenti: dopo
+  un cambio delle finestre serve `--overwrite`.
+- I4: lo stadio 50 valuta L½ quando `half_probs_cal` è nella cache (`per_class.csv`, `confusion.csv`). La cascata a
+  tre livelli resta non portata (decisione aperta su M13).
+- I8: `tests/test_site_v2_chain.py` lancia 01 → 00 → 05 → 20 sui sintetici con `configs/hpc/site_v2.yaml` (fold per
+  take, perché i sintetici hanno un solo sito). `tests/test_hpc_dryrun.py` ricava le dipendenze di `pipeline.sh` da
+  ciò che ogni script legge: è il test che ha trovato la dipendenza 41 → 40.
+- Restano per la seconda parte di C14b: I3 (bootstrap e confronti sul train, metrica per fold), I7, m1, m3, m4, m5.

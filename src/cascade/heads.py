@@ -36,14 +36,23 @@ def fit_head(
     from sklearn.model_selection import StratifiedGroupKFold
 
     best_C, best = Cs[0], None
-    n_splits = min(inner_cv, int(np.bincount(y, minlength=n_classes)[np.bincount(y, minlength=n_classes) > 0].min()))
+    # Le classi con una sola take non entrano nella CV interna: non si possono stratificare e, quando
+    # cadono nella parte di test, pesano sulla perdita con un logit a -50 che non dipende dal modello.
+    # Restano nel fit finale, quindi la testa conosce comunque la classe.
+    takes_per_class = np.array([len(np.unique(groups[y == c])) for c in range(n_classes)])
+    in_cv = takes_per_class[y] >= 2
+    usable = takes_per_class[takes_per_class >= 2]
+    n_splits = min(inner_cv, int(usable.min())) if len(usable) else 1
+    if len(Cs) > 1 and n_splits < 2:
+        log.warning("CV interna di C saltata (nessuna classe con almeno 2 take): uso C=%g", Cs[0])
     if len(Cs) > 1 and n_splits >= 2:
+        Xc, yc, gc = X[in_cv], y[in_cv], groups[in_cv]
         cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
         for C in Cs:
             losses = []
-            for tr, te in cv.split(X, y, groups):
-                m = _make(C, max_iter).fit(X[tr], y[tr])
-                losses.append(nll_from_logits(_logits(m, X[te], n_classes), y[te]))
+            for tr, te in cv.split(Xc, yc, gc):
+                m = _make(C, max_iter).fit(Xc[tr], yc[tr])
+                losses.append(nll_from_logits(_logits(m, Xc[te], n_classes), yc[te]))
             score = float(np.mean(losses))
             if best is None or score < best:
                 best_C, best = C, score
