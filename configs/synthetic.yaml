@@ -28,6 +28,7 @@ folds:
 camformer:
   arch: {d_model: 32, nhead: 2, num_layers: 1, dim_feedforward: 64, output_dim: 32}
   pretrained: false
+  freeze_encoder: false
   train: {epochs: 15, batch_size: 32, patience: 4, lr: 3.0e-3, num_workers: 0}
 egovlp:
   num_workers: 0

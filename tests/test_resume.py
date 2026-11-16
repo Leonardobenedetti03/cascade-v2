@@ -50,6 +50,7 @@ class _ToyModel(torch.nn.Module):
 
 def _cfg(**train):
     over = ["camformer.train.num_workers=0", "camformer.train.pin_memory=false", "camformer.train.batch_size=4"]
+    over += ["camformer.freeze_encoder=false"]  # il modello giocattolo non ha un encoder separato (M17)
     over += [f"camformer.train.{k}={v}" for k, v in train.items()]
     return load_config(overrides=over)
 

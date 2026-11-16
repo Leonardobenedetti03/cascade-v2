@@ -1,17 +1,17 @@
 # Registro delle modifiche metodologiche
 
-Base del paragrafo «Deviations from the original plan» del report. Una riga per modifica (M01–M16, dal blueprint),
+Base del paragrafo «Deviations from the original plan» del report. Una riga per modifica (M01–M16 dal blueprint, M17 decisa dopo),
 con il commit che la introduce; «previsto» = commit non ancora fatto. Sotto, le note di lavorazione: scelte prese
 durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo diverso.
 
-## Modifiche M01–M16
+## Modifiche M01–M17
 
 | ID | Che cosa cambia | Prima (v1) | Perché | Commit |
 |----|-----------------|------------|--------|--------|
 | M01 | Repository nuovo, codice portato selettivamente | Estensioni non usate e script di lancio fuori dal repository | Il codice consegnato è quello che produce i risultati | 9c9147d (C01) … |
 | M02 | Split per sito: test georgiatech, val nus + fair | Split ufficiali per take | L1 al 99% riconosce in parte il laboratorio; leave-one-site-out 61,7%; criteri fissati prima dei risultati | v1 3d5f3b4; v2 88384ba; stadio 27 52546c7 (C12c) |
 | M03 | Fold di train per sito | Fold per take | Le predizioni fuori campione devono simulare lo spostamento verso siti nuovi | 88384ba (C06) |
-| M04 | CamFormer da zero | Checkpoint pubblico come default | Il pretraining ha visto circa il 95% di train e val | d134b40 (C08a) |
+| M04 | CamFormer da zero (**sostituita da M17**) | Checkpoint pubblico come default | Il pretraining ha visto circa il 95% di train e val | d134b40 (C08a) |
 | M05 | Fusione `replace` di default | Fusione log-lineare | Δ = 0,0 nella v1; gli ensemble non migliorano il fronte; L1 diventa l'esperto | aefe79b (C09) |
 | M06 | Gate per famiglie, CompareConfidence | Più di 15 gate senza riferimento | RQ2 tra famiglie citabili; la traiettoria è l'unica variabile tra `compare_A` e `compare_AC` | 9b9b0fb (C11) |
 | M07 | Manifest con chiavi di split e fold | Cambio di fold non rilevato a valle | Impedisce di riusare in silenzio output calcolati con fold diverse | 1d8dd17 (C05) |
@@ -24,6 +24,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | 4d55e67 (C12b); 52546c7 (C12c) |
 | M15 | Epoche e patience di CamFormer (D3) | 30 epoche, patience 5 | Fold 0 e full al tetto con la perdita in calo | d134b40 (C08a) |
 | M16 | `results/` nel repository | Risultati solo sull'HPC e in un backup | Ogni numero del report ha run e commit | previsto dopo le run |
+| M17 | CamFormer dal checkpoint del paper, encoder congelato, si allena solo la testa; EgoVLP invariato (congelato, testa logistica) | v1: checkpoint con fine-tuning end-to-end; blueprint (M04): da zero | Decisione del gruppo (16/11): modelli pre-addestrati su molti più dati, si addestrano solo i classificatori. Limiti dichiarati in N24 | previsto (C14d) |
 
 ## Note di lavorazione
 
@@ -267,3 +268,28 @@ Verificati sul login node con `sacctmgr`, `sinfo`, `scontrol`, `sbatch --test-on
   quinto `sbatch`. Va riorganizzato in pochi job con più stadi in sequenza, come faceva la v1 (`chain.sbatch`).
 - Restano `TODO(HPC)` da chiudere con lo stadio 15: `alignment.mode`, `data.vertical_axis`, `frames.rotate_k90`.
 
+**N24 — C14d: CamFormer pre-addestrato e congelato (M17, sostituisce M04).** Decisione del gruppo del 16/11: per
+entrambi i livelli si usano i pesi pubblicati e si addestra solo il classificatore. Il blueprint diceva il contrario
+(pagina 11, «Addestramento. Da zero (M04)», e tabella del registro a pagina 45): la scelta presa è M17.
+- EgoVLP non cambia: era già congelato (EgoVLP_PT_BEST, stadio 25) con la regressione logistica dello stadio 30.
+- CamFormer: `configs/camformer.yaml` passa a `pretrained: true` e al nuovo `freeze_encoder: true`. Con
+  `freeze_encoder` (`finetune.make_optimizer`) i pesi dell'encoder non richiedono gradiente, l'ottimizzatore riceve
+  solo la testa lineare (lr × `head_lr_mult`) e in addestramento l'encoder resta in `eval` (niente dropout). Senza,
+  il comportamento è quello di prima (fine-tuning end-to-end). La config rifiuta `freeze_encoder` senza
+  `pretrained`; `synthetic.yaml` resta a pesi casuali con `freeze_encoder: false`. La chiave entra nel manifest dello
+  stadio 20 con il blocco `camformer` (già incluso) e in `summary.json`.
+- Checkpoint: `egoexo4d_dur8.pt` da `camformer_checkpoints.zip` (Drive degli autori, `third_party/seeing_without_pixels/DATA.md`),
+  in `paths.camformer_ckpt`. È quello indicato dagli autori per Ego-Exo4D: `pose_encoding` `rel9d_grav` e contesto di
+  8 s, uguali a `camformer.arch` e a `data.window_s` (nessun cambio di config). `hpc_check` lo richiede (con
+  `pretrained` vero lo controllava già).
+- Limiti da dichiarare nel report: (1) il pretraining ha visto circa il 95% delle take di train e val (il motivo di
+  M04); se abbia visto anche il test va verificato sullo split degli autori. Con take già viste la confidenza di L0
+  sulla val può essere troppo alta, e le soglie del gate si calibrano sulla val. (2) Le nostre pose sono quelle della
+  camera RGB convertite a 20 Hz (N2), non quelle del device a 1 kHz del pretraining: con l'encoder congelato la
+  differenza conta (il blueprint la riteneva irrilevante solo con CamFormer da zero). Controllo fissato prima dei
+  risultati: dopo lo stadio 20, l'accuratezza bilanciata di L0 sulla val deve stare chiaramente sopra quella della
+  classe di maggioranza su tutti i seed; altrimenti ci si ferma prima di guardare il test. (3) I tre seed cambiano
+  solo l'inizializzazione della testa e l'ordine dei batch: la varianza tra seed sarà piccola.
+- Test: `test_freeze_encoder_trains_only_the_head`, `test_without_freeze_the_encoder_is_finetuned`,
+  `test_freeze_needs_pretrained_weights` (`tests/test_camformer.py`); `test_hpc_check` aggiornato (il checkpoint
+  CamFormer ora serve); `test_resume` usa `freeze_encoder=false` (il modello giocattolo non ha un encoder separato).

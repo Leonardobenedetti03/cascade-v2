@@ -38,6 +38,10 @@ Comandi per lanciare una run sul cluster. I valori personali (account, partizion
      https://download.pytorch.org/models/mobilenet_v3_small-047dcff4.pth
    ```
 
+   CamFormer (M17, N24): `egoexo4d_dur8.pt` da `camformer_checkpoints.zip` (Google Drive degli autori, link in
+   `third_party/seeing_without_pixels/DATA.md`). Si scarica dal browser sul Mac e si copia con `scp` in
+   `$R/data/checkpoints/camformer/egoexo4d_dur8.pt`; `python -m pytest -q tests/test_camformer.py -k real` lo carica.
+
    `takes.json` non c'è: `site_v2` prende la durata dal video. Le pose per lo stadio 01 si leggono dalle due radici
    in `paths.pose_roots` di `configs/hpc/site_v2.yaml`.
 5. Controlli: `RUN_NAME=site_v2 hpc/check_cluster.sh`. Verifica parametri, import di `torch` e `transformers`,

@@ -37,6 +37,7 @@ def data_tree(tmp_path: Path, monkeypatch) -> Path:
         (data / "egoexo4d" / "takes" / name).mkdir(parents=True)
     for rel in (
         "checkpoints/egovlp/egovlp.pth",
+        "checkpoints/camformer/egoexo4d_dur8.pt",
         "checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth",
         "poses/split_manifest.csv",
     ):
@@ -56,7 +57,8 @@ def test_site_v2_config_loads_and_pins_the_run():
     assert cfg.data.traj_source == "converted_npz" and cfg.data.duration_source == "video"
     assert len(cfg.paths.pose_roots) == 2 and all(r.startswith("/home/") for r in cfg.paths.pose_roots)
     assert cfg.frame_baseline.enabled and not cfg.egovlp.zero_shot.enabled
-    assert cfg.folds.group_by == "site" and not cfg.camformer.pretrained and cfg.fusion.mode == "replace"
+    assert cfg.folds.group_by == "site" and cfg.fusion.mode == "replace"
+    assert cfg.camformer.pretrained and cfg.camformer.freeze_encoder  # M17
     assert dict(cfg.data.expected_split_counts) == {"train": 1138, "val": 68, "test": 67}
     sums = (REPO_ROOT / "splits" / "site_v1" / "SHA256SUMS").read_text().splitlines()
     sha = next(line.split()[0] for line in sums if line.endswith("scenario_site.csv"))
@@ -86,8 +88,8 @@ def test_all_present(data_tree):
     checks = path_checks(_cfg(), "site_v2")
     assert all(c.status == OK for c in checks), [c for c in checks if c.status != OK]
     names = {c.name for c in checks}
-    assert {"takes.json", "pesi EgoVLP", "pesi MobileNetV3-Small", "hash dello split", "take sul disco"} <= names
-    assert "pesi CamFormer" not in names  # camformer.pretrained è falso (M04)
+    assert {"takes.json", "pesi EgoVLP", "pesi CamFormer", "pesi MobileNetV3-Small", "hash dello split"} <= names
+    assert "take sul disco" in names
 
 
 def test_missing_weights_fail(data_tree):
@@ -97,9 +99,11 @@ def test_missing_weights_fail(data_tree):
 
 
 def test_camformer_weights_only_when_pretrained(data_tree):
-    cfg = _cfg("camformer.pretrained=true")
-    st = _status(path_checks(cfg, "site_v2"))
-    assert st["pesi CamFormer"] == FAIL
+    (data_tree / "checkpoints" / "camformer" / "egoexo4d_dur8.pt").unlink()
+    st = _status(path_checks(_cfg(), "site_v2"))
+    assert st["pesi CamFormer"] == FAIL  # M17: il checkpoint serve
+    cfg = _cfg("camformer.pretrained=false", "camformer.freeze_encoder=false")
+    assert "pesi CamFormer" not in _status(path_checks(cfg, "site_v2"))
 
 
 def test_split_hash_mismatch_fails(data_tree):

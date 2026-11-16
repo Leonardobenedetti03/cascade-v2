@@ -1,10 +1,10 @@
 """20 — Fine-tuning di CamFormer (L0) per una fold. [GPU]
 
 Scopo:
-    Carica il checkpoint pre-addestrato (paths.camformer_ckpt, es. egoexo4d_dur8.pt),
-    aggiunge la testa lineare a 8 classi e fa fine-tuning end-to-end sulle take di
-    train della fold, con early stopping e temperature scaling sull'holdout interno
-    (escluso dal training). Encoder e preprocessing sono quelli del submodule CamFormer.
+    Carica il checkpoint pre-addestrato (paths.camformer_ckpt, egoexo4d_dur8.pt),
+    aggiunge la testa lineare e, con camformer.freeze_encoder (M17, default), allena
+    solo la testa con l'encoder congelato; senza, fine-tuning end-to-end. Early stopping
+    e temperature scaling sull'holdout interno (escluso dal training). Encoder e preprocessing sono quelli del submodule CamFormer.
     Il seed del fine-tuning è camformer.seed (default: seed globale); seed diversi
     scrivono in cartelle diverse, per gli stadi stocastici ripetuti (3 seed).
 
@@ -173,6 +173,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         "preds": report,
         "dropped": [x for d in sets.values() for x in d.dropped],
         "pretrained": cfg.camformer.pretrained,
+        "freeze_encoder": cfg.camformer.freeze_encoder,
         "head_from_ckpt": bool(loaded.get("head_loaded", [False])[0]),
     }
     write_json(out / "summary.json", summary)

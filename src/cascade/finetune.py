@@ -1,4 +1,7 @@
-"""Fine-tuning end-to-end di CamFormer per una fold (logica dello stadio 20).
+"""Addestramento di CamFormer per una fold (logica dello stadio 20).
+
+Con ``camformer.freeze_encoder`` (M17, default della run) l'encoder pre-addestrato è congelato e si allena
+solo la testa lineare; altrimenti fine-tuning end-to-end di encoder e testa.
 
 Per la fold k (o ``full``):
 - training sulle take di train con fold ≠ k, escluso l'holdout interno della fold;
@@ -148,6 +151,29 @@ def load_epoch(path: Path, model, opt, key: str):
     return st["epoch"] + 1, st["best"], st["best_state"], st["bad"], st["history"]
 
 
+def make_optimizer(model, cfg):
+    """AdamW con due gruppi: encoder (``lr``) e testa (``lr × head_lr_mult``).
+
+    Con ``camformer.freeze_encoder`` (M17) l'encoder pre-addestrato resta fermo: i suoi pesi non
+    richiedono gradiente e l'ottimizzatore riceve solo la testa lineare.
+    """
+    import torch
+
+    tc = cfg.camformer.train
+    if tc.optimizer.lower() != "adamw":
+        raise ValueError("camformer.train.optimizer: solo adamw nell'MVP")
+    head_params = list(model.head.parameters())
+    head_ids = {id(p) for p in head_params}
+    enc_params = [p for p in model.parameters() if id(p) not in head_ids]
+    groups = [{"params": head_params, "lr": tc.lr * tc.head_lr_mult}]
+    if cfg.camformer.freeze_encoder:
+        for p in enc_params:
+            p.requires_grad_(False)
+    else:
+        groups.insert(0, {"params": enc_params, "lr": tc.lr})
+    return torch.optim.AdamW(groups, weight_decay=tc.weight_decay)
+
+
 def train_fold(
     model,
     train_ds,
@@ -165,15 +191,8 @@ def train_fold(
     import torch.nn.functional as F
 
     tc = cfg.camformer.train
-    head_params = list(model.head.parameters())
-    head_ids = {id(p) for p in head_params}
-    enc_params = [p for p in model.parameters() if id(p) not in head_ids]
-    if tc.optimizer.lower() != "adamw":
-        raise ValueError("camformer.train.optimizer: solo adamw nell'MVP")
-    opt = torch.optim.AdamW(
-        [{"params": enc_params, "lr": tc.lr}, {"params": head_params, "lr": tc.lr * tc.head_lr_mult}],
-        weight_decay=tc.weight_decay,
-    )
+    freeze = bool(cfg.camformer.freeze_encoder)
+    opt = make_optimizer(model, cfg)
     model.to(device)
     best, best_state, bad, history = None, None, 0, []
     start = 0
@@ -185,6 +204,8 @@ def train_fold(
                 start = tc.epochs
     for epoch in range(start, tc.epochs):
         model.train()
+        if freeze:  # encoder congelato: niente dropout né aggiornamenti, solo la testa impara
+            model.encoder.eval()
         tot, n = 0.0, 0
         for b in _loader(
             train_ds,

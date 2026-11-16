@@ -84,3 +84,47 @@ def _real_ckpt():
 def test_real_checkpoint_loads():
     model = build_model(load_config().camformer.arch, 8)
     load_pretrained(model, _real_ckpt())
+
+
+def _one_step(freeze: bool):
+    from src.cascade.finetune import make_optimizer
+
+    cfg = load_config(
+        synthetic=True, overrides=["camformer.pretrained=true", f"camformer.freeze_encoder={str(freeze).lower()}"]
+    )
+    torch.manual_seed(0)
+    model = build_model(cfg.camformer.arch, 8)
+    opt = make_optimizer(model, cfg)
+    enc0 = {k: v.clone() for k, v in model.encoder.state_dict().items()}
+    head0 = {k: v.clone() for k, v in model.head.state_dict().items()}
+    model.train()
+    if freeze:
+        model.encoder.eval()
+    b = _batch()
+    logits, _ = model(b["x"], b["pad_mask"], b["lengths"], b["win_start"], b["win_end"])
+    torch.nn.functional.cross_entropy(logits, b["label"]).backward()
+    opt.step()
+    enc_moved = any(not torch.equal(enc0[k], v) for k, v in model.encoder.state_dict().items())
+    head_moved = any(not torch.equal(head0[k], v) for k, v in model.head.state_dict().items())
+    return model, opt, enc_moved, head_moved
+
+
+def test_freeze_encoder_trains_only_the_head():
+    """M17: con freeze_encoder l'encoder del checkpoint resta identico e impara solo la testa."""
+    model, opt, enc_moved, head_moved = _one_step(freeze=True)
+    assert head_moved and not enc_moved
+    assert len(opt.param_groups) == 1
+    assert not any(p.requires_grad for p in model.encoder.parameters())
+    assert all(p.requires_grad for p in model.head.parameters())
+
+
+def test_without_freeze_the_encoder_is_finetuned():
+    model, opt, enc_moved, head_moved = _one_step(freeze=False)
+    assert head_moved and enc_moved and len(opt.param_groups) == 2
+
+
+def test_freeze_needs_pretrained_weights():
+    with pytest.raises(Exception, match="freeze_encoder"):
+        load_config(synthetic=True, overrides=["camformer.freeze_encoder=true"])
+    cfg = load_config()  # configs/camformer.yaml: la run usa il checkpoint congelato (M17)
+    assert cfg.camformer.pretrained and cfg.camformer.freeze_encoder

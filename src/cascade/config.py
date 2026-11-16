@@ -128,6 +128,7 @@ class CamformerCfg:
     train: CamformerTrain = field(default_factory=CamformerTrain)
     context_s: Optional[float] = None  # None = uguale alla finestra
     pretrained: bool = True
+    freeze_encoder: bool = False  # M17: encoder del checkpoint congelato, si allena solo la testa
     init_head_from_ckpt: bool = False
     eval_source: str = "fold_ensemble"  # fold_ensemble | full
     seed: Optional[int] = None  # seed del fine-tuning (None = seed globale)
@@ -444,6 +445,8 @@ def validate_config(cfg: Config) -> None:
     _one_of(e, "camformer.train.optimizer", cam.train.optimizer.lower(), ["adamw"])
     if cam.context_s is not None and cam.context_s < d.window_s:
         e.append("camformer.context_s deve essere >= data.window_s (o null)")
+    if cam.freeze_encoder and not cam.pretrained:
+        e.append("camformer.freeze_encoder richiede camformer.pretrained=true (congelare pesi casuali non ha senso)")
     if cam.mc_dropout_passes < 0 or cam.train.lr <= 0:
         e.append("camformer.mc_dropout_passes >= 0 e camformer.train.lr > 0")
     if len(ev.frame_indices) != ev.arch.num_frames:
