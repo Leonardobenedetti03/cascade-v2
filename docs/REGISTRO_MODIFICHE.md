@@ -293,3 +293,19 @@ entrambi i livelli si usano i pesi pubblicati e si addestra solo il classificato
 - Test: `test_freeze_encoder_trains_only_the_head`, `test_without_freeze_the_encoder_is_finetuned`,
   `test_freeze_needs_pretrained_weights` (`tests/test_camformer.py`); `test_hpc_check` aggiornato (il checkpoint
   CamFormer ora serve); `test_resume` usa `freeze_encoder=false` (il modello giocattolo non ha un encoder separato).
+
+**N25 — C14e: ambiente sull'account di Giorgio e caricamento del checkpoint EgoVLP vero (16/11).** La run gira
+dall'account HPC di Giorgio (3195149): la home di Leo è quasi piena (circa 47 GB su 50) e lo spazio conta per
+proprietario. Il dataset resta dov'è e si legge dalle home di Leo e Jacopo; `egovlp.pth` è diventato leggibile da tutti
+(`chmod go+r`, il file non è stato toccato). Sull'account di Giorgio: clone con una deploy key propria («HPC giorgio»,
+lettura e scrittura), `hpc/env.local.sh` con `SLURM_ACCOUNT=3195149` e `DL4CV_ROOT=$HOME/cascade_v2_root`, ambiente in
+`~/venvs/cascade-v2` (5,6 GB). Con l'indice `cu121` pip installa torch 2.5.1 e torchvision 0.20.1, non la 2.8 del Mac:
+la suite passa uguale. `check_cluster.sh site_v2`: tutto a posto, compresi i tre pesi e `sbatch --test-only`.
+- Unico test fallito: `test_egovlp.py::test_real_checkpoint_loads`, `ModuleNotFoundError: No module named
+  'parse_config'`. Il checkpoint EgoVLP_PT_BEST salva anche la config di addestramento come oggetto
+  `parse_config.ConfigParser` del repository EgoVLP. `load_state` ora usa un Unpickler che sostituisce le classi non
+  importabili con un segnaposto mai usato (serve solo `state_dict`); scartata l'alternativa di mettere
+  `third_party/EgoVLP` nel path, che importerebbe il loro codice di addestramento. Test:
+  `test_load_state_ignores_classes_missing_from_the_path`, che riproduce l'errore.
+- Il checkpoint CamFormer `egoexo4d_dur8.pt` (scaricato dal Drive degli autori e copiato con `scp`) si carica:
+  `test_camformer.py::test_real_checkpoint_loads` passa sul cluster.

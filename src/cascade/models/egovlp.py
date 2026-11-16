@@ -60,10 +60,41 @@ def _strip_module(sd: Dict) -> Dict:
     return {k[len("module.") :] if k.startswith("module.") else k: v for k, v in sd.items()}
 
 
+def _tolerant_pickle():
+    """Modulo ``pickle`` il cui Unpickler sostituisce le classi non importabili con un segnaposto.
+
+    Il checkpoint EgoVLP_PT_BEST salva anche la config di addestramento come oggetto
+    ``parse_config.ConfigParser`` del repository EgoVLP: senza quel modulo nel path ``torch.load``
+    fallisce, anche se a noi serve solo ``state_dict``. Il segnaposto non viene mai usato.
+    """
+    import pickle
+    import types
+
+    class _Missing:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __setstate__(self, state):
+            self.__dict__["_state"] = state
+
+    class _Unpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            try:
+                return super().find_class(module, name)
+            except (ModuleNotFoundError, AttributeError):
+                log.info("checkpoint: classe %s.%s non importabile, sostituita da un segnaposto", module, name)
+                return _Missing
+
+    mod = types.ModuleType("tolerant_pickle")
+    mod.__dict__.update({k: getattr(pickle, k) for k in dir(pickle) if not k.startswith("__")})
+    mod.Unpickler = _Unpickler
+    return mod
+
+
 def load_state(ckpt_path: Path) -> Dict:
     import torch
 
-    ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    ck = torch.load(ckpt_path, map_location="cpu", weights_only=False, pickle_module=_tolerant_pickle())
     sd = ck["state_dict"] if isinstance(ck, dict) and "state_dict" in ck else ck
     return _strip_module(sd)
 

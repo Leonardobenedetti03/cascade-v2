@@ -88,3 +88,29 @@ def test_real_checkpoint_loads():
     from src.cascade.models.egovlp import load_state
 
     load_video_weights(build_video_model(load_config().egovlp.arch), load_state(_real_ckpt()))
+
+
+def test_load_state_ignores_classes_missing_from_the_path(tmp_path, monkeypatch):
+    """Il checkpoint vero contiene un ``parse_config.ConfigParser`` del repository EgoVLP (errore visto sul
+    cluster il 16/11): ``load_state`` deve restituire lo ``state_dict`` anche senza quel modulo."""
+    import sys
+    import types
+
+    from src.cascade.models.egovlp import load_state
+
+    fake = types.ModuleType("parse_config")
+
+    class ConfigParser:
+        def __init__(self):
+            self.config = {"arch": "x"}
+
+    ConfigParser.__module__, ConfigParser.__qualname__ = "parse_config", "ConfigParser"
+    fake.ConfigParser = ConfigParser
+    monkeypatch.setitem(sys.modules, "parse_config", fake)
+    ck = {"state_dict": {"module.video_model.w": torch.ones(2)}, "config": ConfigParser(), "epoch": 3}
+    torch.save(ck, tmp_path / "ck.pth")
+    monkeypatch.delitem(sys.modules, "parse_config")
+    with pytest.raises(ModuleNotFoundError):
+        torch.load(tmp_path / "ck.pth", map_location="cpu", weights_only=False)
+    sd = load_state(tmp_path / "ck.pth")
+    assert list(sd) == ["video_model.w"] and torch.equal(sd["video_model.w"], torch.ones(2))
