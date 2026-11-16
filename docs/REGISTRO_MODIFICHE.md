@@ -309,3 +309,22 @@ la suite passa uguale. `check_cluster.sh site_v2`: tutto a posto, compresi i tre
   `test_load_state_ignores_classes_missing_from_the_path`, che riproduce l'errore.
 - Il checkpoint CamFormer `egoexo4d_dur8.pt` (scaricato dal Drive degli autori e copiato con `scp`) si carica:
   `test_camformer.py::test_real_checkpoint_loads` passa sul cluster.
+
+**N26 — C14f: prova dbg_smoke sul cluster, chiusi i tre TODO(HPC) dello stadio 15 (16/11).** Run `dbg_smoke` con
+`site_v2` dall'account di Giorgio, commit 3b5f6b4. Stadio 01 (job 768476, 3 min): 1273 take convertite su 1273, 2 con
+righe prima della prima posa, 52 con buchi. Stadio 00 (job 768529, 3 min): 1273 clip, tutte utilizzabili, 3 take con
+problemi segnalate (da guardare prima della run vera, non bloccano). Stadio 15 (job 768535, 2 min): 6 take della val
+(nus_covidtest_36_2, nus_cooking_10_4, nus_covidtest_01_2, fair_cooking_06_4, nus_cooking_17_5, nus_covidtest_32_3).
+- `frames.rotate_k90 = 0`: in tutte le 48 miniature i frame sono dritti (tavolo e mani in basso, soffitto in alto).
+- `data.vertical_axis = 2`: la quota resta entro circa ±0,25 m dalla posa iniziale, anche nelle take di cucina in cui
+  la persona si sposta di metri; un asse orizzontale darebbe escursioni di metri. Gli abbassamenti coincidono con i
+  frame in cui la persona si china (lavello in nus_cooking_10_4 tra 50 e 95 s, tavolo in nus_covidtest_32_3 tra 47 e
+  63 s).
+- `alignment.mode = same_origin`, `offset_s = 0`: in tutte e sei le take la traiettoria copre il video dall'inizio
+  alla fine, senza tratti vuoti a un capo (uno sfasamento di secondi si vedrebbe lì), e gli abbassamenti cadono sui
+  frame corrispondenti. Limite: con 8 frame per take il controllo esclude sfasamenti di qualche secondo, non di
+  frazioni di secondo; rispetto a una finestra di 8 s l'effetto residuo è piccolo. `device_us` non serve.
+- Blueprint e realtà: la sequenza «00 --inspect, poi 15» del RUNBOOK non funziona, perché `--inspect` non scrive il
+  manifest dello stadio 00 e lo stadio 15 lo richiede (`FileNotFoundError` nel job 768518). Scelta presa: nessuna
+  modifica al codice (è il comportamento voluto di `--inspect`); il RUNBOOK ora elenca 01, 00 completo, 15.
+- Solo commenti e documentazione: i valori delle config non cambiano (config caricate identiche prima e dopo).

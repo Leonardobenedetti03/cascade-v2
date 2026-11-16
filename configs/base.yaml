@@ -37,7 +37,7 @@ data:
   pose_src_fps: 30.0         # frequenza delle pose per frame di Ego-Exo4D (stadio 01)
   pose_max_gap_frames: 15    # buchi sorgente più lunghi (a 30 Hz: 0,5 s): nessuna traiettoria (stadio 01)
   min_traj_coverage: 0.9     # frazione minima della finestra coperta dalla traiettoria
-  vertical_axis: 2           # asse "su" del mondo Aria (gravità = -z). TODO(HPC)
+  vertical_axis: 2           # asse "su" del mondo Aria (gravità = -z): verificato con lo stadio 15 (N26)
   out_of_range: drop         # finestra oltre la fine del video: drop (scarta la clip) | clamp (ultimo frame)
   short_take: keep           # take più corta di window_s: keep (finestra = take intera) | drop
   max_missing_frac: 0.02     # clip perse tra uno stadio e l'altro oltre cui fermarsi (fail fast)
@@ -46,7 +46,7 @@ data:
 alignment:
   # same_origin: t=0 della traiettoria coincide con t=0 del video (+ offset_s).
   # device_us:   offset = (traj_start_us - video_start_us) / 1e6 dai metadati della take.
-  mode: same_origin          # TODO(HPC): verificare con 15_alignment_check
+  mode: same_origin          # verificato con lo stadio 15 (N26): nessuno sfasamento visibile, offset 0
   offset_s: 0.0
   scale: 1.0
   video_start_key: video_start_us
@@ -63,7 +63,7 @@ frames:
   pre_resize_mode: bicubic
   pre_resize_antialias: true
   final_antialias: false
-  rotate_k90: 0              # rotazioni di 90° antiorarie. TODO(HPC): i frame Aria sono dritti?
+  rotate_k90: 0              # rotazioni di 90° antiorarie: i frame 448 di Ego-Exo4D sono già dritti (N26)
   decoder: auto              # auto | decord | pyav
 
 folds:

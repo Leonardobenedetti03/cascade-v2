@@ -24,5 +24,5 @@ egovlp:
   zero_shot:
     enabled: false   # D8: nessun modello di testo, quindi nessun download sui nodi senza rete
 
-# Ancora da verificare sul cluster (TODO(HPC) in base.yaml): alignment.mode, data.vertical_axis e
-# frames.rotate_k90 (stadio 15). Percorsi, pose_roots e takes.json sono chiusi in N23.
+# alignment.mode, data.vertical_axis e frames.rotate_k90 restano ai valori di base.yaml, verificati con lo
+# stadio 15 nella run dbg_smoke (N26). Percorsi, pose_roots e takes.json sono chiusi in N23.

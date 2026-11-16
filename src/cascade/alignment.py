@@ -14,7 +14,8 @@ Schemi (``alignment.mode``):
   (``traj_start_us``, ``video_start_us``):
   ``t_video = scale * (t_traj + (traj_start_us - video_start_us) / 1e6) + offset_s``.
 
-TODO(HPC): verificare quale schema vale per Ego-Exo4D con ``15_alignment_check.py``.
+Per Ego-Exo4D vale ``same_origin`` con ``offset_s = 0``: verificato con ``15_alignment_check.py``
+sulla run dbg_smoke (N26).
 """
 
 from __future__ import annotations

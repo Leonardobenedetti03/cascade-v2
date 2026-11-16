@@ -53,7 +53,16 @@ Comandi per lanciare una run sul cluster. I valori personali (account, partizion
    ```
 
    `--inspect` stampa la struttura reale delle cartelle e il video e la traiettoria attesi per una take: conferma i
-   percorsi di N23. Le correzioni si fanno sul Mac, con commit e CI verde, poi `git pull --ff-only`.
+   percorsi di N23. Non scrive il manifest dello stadio 00: prima dello stadio 15 serve lo stadio 00 completo (N26).
+
+   ```bash
+   RUN_NAME=dbg_smoke RUN_CONFIG=site_v2 hpc/submit.sh 01   # pose convertite (serve allo stadio 00)
+   RUN_NAME=dbg_smoke RUN_CONFIG=site_v2 hpc/submit.sh 00   # clips.csv e manifest
+   RUN_NAME=dbg_smoke RUN_CONFIG=site_v2 hpc/submit.sh 15   # figure in $R/runs/dbg_smoke/15_alignment/
+   ```
+
+   Le figure dello stadio 15 si guardano sul Mac (`scp` dalla scheda del Mac, non da quella del cluster). Le
+   correzioni si fanno sul Mac, con commit e CI verde, poi `git pull --ff-only`.
 
 ## 2. Run vera
 
