@@ -18,7 +18,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M08 | Conversione delle pose come stadio 01 | Script esterno senza manifest | Riproducibilità | fe15eb0 (C07a), 31714af (C07b) |
 | M09 | Accuratezza bilanciata, I(δ), trasferimento delle soglie | Solo accuratezza e metriche a budget | Squilibrio delle classi; metrica e analisi di Lebovitz | 4d55e67 (C12b); 52546c7 (C12c) |
 | M10 | Costo end-to-end e sensibilità al costo delle pose | Solo GMACs e latenza dei modelli | I GMACs non misurano decodifica e camera | f7e6325 (C10) |
-| M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | 9bbe819 (C13a) |
+| M11 | Un solo sistema di lancio, ambiente persistente | `slurm/` documentato ma non usato; script ad hoc | Riproducibilità e tempo | 9bbe819 (C13a); catena a 4 job: previsto (C14c-2) |
 | M12 | Estensioni non portate: streaming, keystep, fine-tuning di L1, gate bayesiano | Presenti nel codice | Fuori dalle RQ; restano nella v1 | 41b0f62 (C04), ca2154f (C08b) |
 | M13 | Baseline a un frame eseguita; tre livelli come analisi secondaria | Codice presente, mai eseguito | Senza, il confronto sul costo è incompleto | previsto C08 |
 | M14 | Sei classi riportate; Bouldering fuori dalle metriche per classe; Music assente | Otto scenari dichiarati | Music non è nel sottoinsieme; 2 take non permettono stime | 4d55e67 (C12b); 52546c7 (C12c) |
@@ -328,3 +328,53 @@ problemi segnalate (da guardare prima della run vera, non bloccano). Stadio 15 (
   manifest dello stadio 00 e lo stadio 15 lo richiede (`FileNotFoundError` nel job 768518). Scelta presa: nessuna
   modifica al codice (è il comportamento voluto di `--inspect`); il RUNBOOK ora elenca 01, 00 completo, 15.
 - Solo commenti e documentazione: i valori delle config non cambiano (config caricate identiche prima e dopo).
+
+**N27 — C14c-2: la run come catena di 4 job, strada A per gli stadi 50–55, take corte (16/11).** Chiude il punto
+aperto di N23: la QOS `stud` ammette 4 job in coda per utente e conta ogni elemento di un array, e `hpc/pipeline.sh`
+del blueprint (17.4: circa 25 sottomissioni, più gli array dello stadio 10 e dello stadio 20) avrebbe visto rifiutato
+il quinto `sbatch`. Blueprint e realtà non coincidono; scelta presa: quattro job, ognuno con più stadi in sequenza,
+come il `chain.sbatch` della v1.
+- `hpc/submit.sh --chain <nome> "<stadio> [argomenti]; ..."` sottomette un job che esegue gli stadi in ordine
+  (`STAGE_LIST`). Risorse: nodo GPU se almeno uno stadio è GPU, CPU e memoria massime, tempo = somma dei tempi della
+  tabella (×6 per le fold dello stadio 20, ×`NUM_SHARDS` per lo stadio 10), al massimo 24 ore. La tabella degli stadi
+  passa da `submit.sh` al nuovo `hpc/stages.sh`, letto anche da `stage.sbatch`. `submit.sh <stadio>` resta invariato
+  per i rilanci singoli.
+- `hpc/stage.sbatch` in modalità catena: le fold dello stadio 20 (0–4 e `full`) girano una dopo l'altra; lo stadio 10
+  gira una volta su tutte le clip, senza shard (manifest `shard000of001`, che lo stadio 25 accetta). Uno stadio con
+  `?` (lo stadio 15) è diagnostico: se fallisce, la catena va avanti, come nel blueprint dove 15 «non blocca nulla»;
+  uno script che manca e ha `?` si salta. Al primo errore di uno stadio normale il job esce con il suo codice e
+  `--kill-on-invalid-dep` cancella i job a valle. Il requeue al limite di tempo resta: il job riparte dal primo stadio
+  e i manifest saltano quelli completi.
+- `hpc/pipeline.sh`: A (CPU) 01 → 00 → 05 → 10 → 15?; B1 (GPU) 25 → 28 → 40 → 41 → 20 per il primo seed; B2 (GPU) 20
+  per gli altri seed, in parallelo a B1 (8 + 4 CPU e 2 GPU: dentro i 12 CPU e 2 GPU della QOS); C (CPU) 27 → 30 → 35 e
+  45 per seed → 50 per seed → 52 → 55. Con un seed solo B2 e 52 non ci sono; 55 entra solo se lo script esiste
+  (C13b). Tempi stimati con `NUM_SHARDS=8`: A 10 h, B1 8 h 30, B2 12 h, C circa 6 h 30; sono le stime della tabella,
+  da correggere con `sacct` dopo la run.
+- `hpc/final.sh`: un solo job (50 `--final` per seed, 52, 55) invece di cinque, che con tre seed superavano la QOS.
+  Con `NO_REQUEUE=1` (`--no-requeue` e `MAX_REQUEUE=0`): un rilancio automatico valuterebbe il test una seconda volta.
+- Strada A (decisione del 16/11): la run vera parte prima di C14b-2 (I3, I7, m1–m5) e di C13b (stadio 55), che
+  cambiano soprattutto gli stadi 50–55. Questi si rifanno dopo, al commit nuovo, con `hpc/pipeline.sh --redo-gate`
+  (un job: 50 per seed e 52 con `--overwrite`, poi 55), senza rifare 00–45. Il blueprint chiede un solo commit nei
+  manifest 00–52 (principio 8 e `verify_run`): `verify_run.sh` ora accetta un commit per 00–45 e uno, uguale al
+  clone, per 50–52, solo se il primo precede il secondo (`git merge-base --is-ancestor`) e tra i due non cambia
+  nessuno script `scripts/` degli stadi 00–45 (altrimenti FALLITO); le differenze in `src/` e `configs/` le elenca
+  da controllare a mano, perché lo stesso modulo può servire sia a monte sia al gate. Le chiavi di config cambiate
+  le ferma già il manifest (`ConfigMismatch`). Limite da dichiarare nel report: i risultati citano due commit. Se
+  C14b-2 tocca codice degli stadi 00–45 (per esempio I7, «cache ridotta», nello stadio 45), la strada A non basta:
+  si rifà da quello stadio in poi.
+- Test (`tests/test_hpc_dryrun.py`, 28 invece di 13): le dipendenze della catena si ricavano ancora da ciò che ogni
+  script legge, ora contando l'ordine dentro il job; 4 job entro i limiti della QOS; contenuto e risorse di ogni
+  job; `--redo-gate`; `--chain` con stadi sconosciuti; `NO_REQUEUE`. `stage.sbatch` ora gira nei test, con un
+  `python` finto: ordine degli stadi, sei fold, stadio 10 senza shard, stadio diagnostico che fallisce, arresto al
+  primo errore, script mancante saltato, task singolo di array, commit sbagliato (exit 3). `verify_run.sh` su run_dir
+  finte: un commit, strada A accettata, script a monte cambiato, 50–52 non al commit del clone, commit misti a monte.
+  I test che eseguono `stage.sbatch` e `verify_run.sh` richiedono `sha256sum` e altrimenti si saltano. Provati in
+  sandbox (Python 3.9, bash 5); 17 dei nuovi test falliscono con gli script di prima.
+- Le 3 «take con problemi» dello stadio 00 di `dbg_smoke` (N26) sono `short_take`, tutte nel train e tutte Basketball:
+  sfu_basketball_08_40 (3,6 s), sfu_basketball_11_40 (7,1 s), sfu_basketball_11_44 (6,6 s). Con `data.short_take:
+  keep` la clip è la take intera. Gli stadi a valle le reggono: lo stadio 10 prende i frame dentro la finestra vera,
+  la copertura della traiettoria (stadi 20 e 45, `slice_window`) si calcola sulla durata della finestra e non su 8 s,
+  CamFormer prende sequenze di lunghezza variabile con la maschera di padding. Il blueprint non tratta il caso.
+  Scelta presa: si tengono (`keep`, nessuna modifica). Con l'encoder congelato (M17) entrano solo nell'addestramento
+  della testa lineare: 3 esempi con un contesto più corto, nessuno in val o test. Alternativa scartata: `drop`, cioè
+  addestrare solo su finestre piene come il pretraining di `egoexo4d_dur8.pt`.

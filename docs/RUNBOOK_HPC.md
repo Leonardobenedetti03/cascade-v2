@@ -70,16 +70,34 @@ Prima, dal Mac: CI verde sull'ultimo commit di `main`. Poi, sul cluster:
 
 ```bash
 git pull --ff-only
-RUN_NAME=site_v2 hpc/pipeline.sh      # seed da SEEDS (default "0 1 2"); il piano finisce in logs/pipeline_*.txt
+RUN_NAME=site_v2 hpc/pipeline.sh      # 4 job (A, B1, B2, C); seed da SEEDS (default "0 1 2"); piano in logs/pipeline_*.txt
 squeue -u $USER                       # coda; sacct -j <id> per tempi e memoria
 RUN_NAME=site_v2 hpc/verify_run.sh    # controlli prima di leggere i numeri
-RUN_NAME=site_v2 hpc/final.sh         # il TEST, una volta, con conferma
+RUN_NAME=site_v2 hpc/final.sh         # il TEST, una volta, con conferma (un job, senza requeue)
 RUN_NAME=site_v2 hpc/collect_results.sh   # archivio dei file piccoli da portare sul Mac in results/site_v2
 ```
 
-Il commit nei manifest degli stadi 00–52 deve essere uguale a quello del clone (`verify_run.sh`): dopo la run non si
-fa `git pull`. I tempi della tabella di `hpc/submit.sh` sono stime; si correggono con `sacct` o con
-`TIME_OVERRIDE=hh:mm:ss MEM_OVERRIDE=16G` sul singolo lancio. I limiti della QOS li stampa `check_cluster.sh`.
+La QOS `stud` ammette 4 job in coda per utente e conta ogni elemento di un array (N27): `pipeline.sh` sottomette
+quattro job, ognuno con più stadi in sequenza (`hpc/submit.sh --chain`). Fold e shard girano uno dopo l'altro nello
+stesso job.
+
+| Job | Nodo | Stadi | Dopo |
+|-----|------|-------|------|
+| A | CPU | 01 → 00 → 05 → 10 → 15 (diagnostico: se fallisce la catena va avanti) | — |
+| B1 | GPU | 25 → 28 → 40 → 41 → 20 per il primo seed | A |
+| B2 | GPU | 20 per gli altri seed (in parallelo a B1) | A |
+| C | CPU | 27 → 30 → 35 e 45 per seed → 50 per seed → 52 → 55 | B1, B2 |
+
+Le risorse di ogni job sono il massimo di CPU e memoria degli stadi e la somma dei tempi della tabella di
+`hpc/stages.sh` (stime: si correggono con `sacct`, o con `TIME_OVERRIDE=hh:mm:ss MEM_OVERRIDE=16G`). I limiti della
+QOS li stampa `check_cluster.sh`. Un job della catena che fallisce cancella quelli che ne dipendono
+(`--kill-on-invalid-dep`); si rilancia `pipeline.sh` e i manifest saltano gli stadi già completi.
+
+Dopo la run non si fa `git pull`, con un'eccezione (strada A, N27): gli stadi 50–55 si possono rifare a un commit più
+recente, per esempio dopo C14b-2 o C13b, con `RUN_NAME=site_v2 hpc/pipeline.sh --redo-gate` (un job: 50 per seed e 52
+con `--overwrite`, poi 55). `verify_run.sh` accetta due commit, uno per 00–45 e quello del clone per 50–52, solo se il
+primo precede il secondo e tra i due non è cambiato nessuno script degli stadi 00–45; le differenze in `src/` e
+`configs/` le elenca da controllare a mano.
 
 ## 3. Quando un job fallisce
 
@@ -87,7 +105,8 @@ fa `git pull`. I tempi della tabella di `hpc/submit.sh` sono stime; si correggon
   non allineati). Il messaggio dice quale; il job non ha toccato nulla.
 - Limite di tempo o nodo perso: il job torna in coda da solo (al massimo `MAX_REQUEUE` volte) e riprende dalle parti
   finite. Lo stadio 20 riparte dall'ultima epoca salvata.
-- Rilancio di un solo stadio: `RUN_NAME=site_v2 hpc/submit.sh <stadio> [-- argomenti]`. I manifest saltano ciò che è
-  completo con la stessa config; `-- --overwrite` rifà.
+- Rilancio di un solo stadio: `RUN_NAME=site_v2 hpc/submit.sh <stadio> [-- argomenti]` (un job; con gli array di 10 e
+  20 conta come 8 e 6 job: meglio `hpc/submit.sh --chain <nome> "<stadio> [argomenti]"`). I manifest saltano ciò che è
+  completo con la stessa config; `--overwrite` rifà.
 - Log: `<run_dir>/logs/` (uno per job, con la riga di partenza e di fine) e `logs/slurm/` nel clone.
 - Un traceback nei log fa fallire `verify_run.sh`: va letto e risolto prima di guardare i risultati.

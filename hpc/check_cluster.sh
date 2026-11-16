@@ -70,7 +70,7 @@ else
   warn "sbatch non trovato: questo non è il login node"
 fi
 
-echo "5. limiti del cluster (solo da leggere: confrontarli con la tabella di hpc/submit.sh)"
+echo "5. limiti del cluster (solo da leggere: confrontarli con la tabella di hpc/stages.sh)"
 if command -v sacctmgr > /dev/null 2>&1 && [[ -n "${SLURM_QOS:-}" ]]; then
   sacctmgr -n -P show qos "$SLURM_QOS" format=Name,MaxWall,MaxTRESPU,MaxJobsPU,MaxSubmitPU 2>&1 | sed 's/^/  info     qos: /'
 fi

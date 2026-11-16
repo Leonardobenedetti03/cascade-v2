@@ -1,53 +1,70 @@
 #!/bin/bash
-# hpc/submit.sh - sottomette UNO stadio con le risorse giuste. Stampa il job id.
+# hpc/submit.sh - sottomette UNO stadio, oppure UNA catena di stadi in un solo job. Stampa il job id.
 #   RUN_NAME=site_v2 hpc/submit.sh <stadio> [--after ID[:ID...]] [-- argomenti per lo script]
+#   RUN_NAME=site_v2 hpc/submit.sh --chain <nome> "<stadio> [arg...]; <stadio> [arg...]" [--after ID[:ID...]]
 # Esempi:
 #   RUN_NAME=site_v2 hpc/submit.sh 10                                  # array di NUM_SHARDS shard
 #   RUN_NAME=site_v2 hpc/submit.sh 20 --after 123 -- --set camformer.seed=1
 #   RUN_NAME=dbg_smoke RUN_CONFIG=site_v2 hpc/submit.sh 00 -- --inspect   # run di prova
+#   RUN_NAME=site_v2 hpc/submit.sh --chain B2 "20 --set camformer.seed=1; 20 --set camformer.seed=2"
+# Catena (C14c-2, N27): gli stadi girano in sequenza nello stesso job, senza array (la QOS stud conta ogni
+# elemento di un array come un job). Uno stadio con "?" dopo il numero (es. "15?") e' diagnostico: se
+# fallisce la catena va avanti. Risorse del job: nodo GPU se almeno uno stadio e' GPU, CPU e memoria
+# massime, tempo = somma dei tempi (x6 per le fold, xNUM_SHARDS per lo stadio 10), al massimo 24 ore.
+# NO_REQUEUE=1: il job non torna mai in coda (hpc/final.sh: il test non si valuta due volte).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source hpc/env.sh
+source hpc/stages.sh
 die() { echo "submit: $*" >&2; exit 2; }
 
-STAGE="${1:?uso: hpc/submit.sh <stadio> [--after ID[:ID]] [-- argomenti]}"; shift
+CHAIN=""
+STAGE_LIST=""
+if [[ "${1:-}" == "--chain" ]]; then
+  CHAIN="${2:?uso: hpc/submit.sh --chain <nome> \"<stadio> [arg...]; ...\" [--after ID]}"
+  STAGE_LIST="${3:?catena $CHAIN senza stadi}"
+  shift 3
+  STAGE="$CHAIN"
+else
+  STAGE="${1:?uso: hpc/submit.sh <stadio> [--after ID[:ID]] [-- argomenti]}"; shift
+fi
 AFTER=""
 if [[ "${1:-}" == "--after" ]]; then AFTER="$2"; shift 2; fi
 if [[ "${1:-}" == "--" ]]; then shift; fi
+[[ -z "$CHAIN" || $# -eq 0 ]] || die "con --chain gli argomenti vanno dentro la catena, non dopo --"
 export RUN_NAME="${RUN_NAME:?RUN_NAME mancante (site_v2 | id_v2 | dbg_*)}"
 export RUN_CONFIG="${RUN_CONFIG:-$RUN_NAME}"
 export STAGE_ARGS="$*"
 [[ -f "configs/hpc/$RUN_CONFIG.yaml" ]] || die "manca configs/hpc/$RUN_CONFIG.yaml"
 [[ -n "$DL4CV_ROOT" ]] || die "TODO(HPC): DL4CV_ROOT in hpc/env.sh o hpc/env.local.sh"
 
-# stadio -> script, nodo, CPU, memoria, tempo massimo, tipo di array.
-# Valori di partenza (stime): correggerli con i tempi del primo run (sacct).
-# (funzione con case e non array associativo: gira anche con la bash 3.2 del Mac, dove si prova)
-stage_row() {
-  case "$1" in
-    00) echo "00_inventory.py              cpu 4 8G  00:30:00 none" ;;
-    01) echo "01_convert_trajectories.py   cpu 4 8G  01:00:00 none" ;;
-    05) echo "05_folds.py                  cpu 1 4G  00:10:00 none" ;;
-    10) echo "10_extract_frames.py         cpu 4 8G  01:00:00 shard" ;;
-    15) echo "15_alignment_check.py        cpu 2 8G  00:20:00 none" ;;
-    20) echo "20_camformer_finetune.py     gpu 4 16G 01:00:00 fold" ;;
-    25) echo "25_egovlp_features.py        gpu 8 32G 01:00:00 none" ;;
-    27) echo "27_site_diagnostics.py       cpu 4 16G 00:30:00 none" ;;
-    28) echo "28_frame_baseline.py         gpu 4 16G 00:30:00 none" ;;
-    30) echo "30_l1_heads.py               cpu 8 16G 00:30:00 none" ;;
-    35) echo "35_fusion.py                 cpu 2 8G  00:15:00 none" ;;
-    40) echo "40_cost.py                   gpu 2 16G 00:15:00 none" ;;
-    41) echo "41_cost_e2e.py               gpu 4 16G 00:45:00 none" ;;
-    45) echo "45_build_cache.py            cpu 4 16G 00:30:00 none" ;;
-    50) echo "50_gate_eval.py              cpu 8 16G 01:00:00 none" ;;
-    52) echo "52_aggregate_seeds.py        cpu 1 4G  00:10:00 none" ;;
-    55) echo "55_report.py                 cpu 2 8G  00:20:00 none" ;;
-    *) return 1 ;;
-  esac
-}
-ROW=$(stage_row "$STAGE") || die "stadio sconosciuto: $STAGE"
-read -r SCRIPT KIND CPUS MEM TIME ARRAY <<< "$ROW"
-export STAGE_SCRIPT="$SCRIPT" ARRAY_KIND="$ARRAY"
+if [[ -z "$CHAIN" ]]; then
+  ROW=$(stage_row "$STAGE") || die "stadio sconosciuto: $STAGE"
+  read -r SCRIPT KIND CPUS MEM TIME ARRAY <<< "$ROW"
+  export STAGE_SCRIPT="$SCRIPT" ARRAY_KIND="$ARRAY" STAGE_LIST=""
+else
+  # risorse della catena: massimo di CPU e memoria, somma dei tempi
+  KIND=cpu; CPUS=1; MEMG=1; SECS=0; N=0
+  IFS=';' read -r -a SPECS <<< "$STAGE_LIST"
+  for spec in "${SPECS[@]}"; do
+    read -r st _ <<< "$spec"
+    [[ -n "${st:-}" ]] || continue
+    st="${st%\?}"
+    ROW=$(stage_row "$st") || die "catena $CHAIN: stadio sconosciuto: $st"
+    read -r _ k c m t a <<< "$ROW"
+    [[ "$k" == gpu ]] && KIND=gpu
+    (( c > CPUS )) && CPUS=$c
+    (( ${m%G} > MEMG )) && MEMG=${m%G}
+    n=1
+    case "$a" in fold) n=6 ;; shard) n=$NUM_SHARDS ;; esac
+    SECS=$(( SECS + n * $(hms_to_s "$t") ))
+    N=$((N + 1))
+  done
+  (( N > 0 )) || die "catena $CHAIN senza stadi"
+  (( SECS > 86400 )) && SECS=86400   # limite della QOS stud: 1 giorno per job
+  MEM="${MEMG}G"; TIME=$(s_to_hms "$SECS"); ARRAY=none
+  export STAGE_SCRIPT="" ARRAY_KIND="none" STAGE_LIST CHAIN_NAME="$CHAIN"
+fi
 TIME="${TIME_OVERRIDE:-$TIME}"; MEM="${MEM_OVERRIDE:-$MEM}"
 
 # Preflight sul login node (qui la rete c'e'): clone pulito e allineato a origin/main.
@@ -69,6 +86,7 @@ fi
 if [[ -n "$SLURM_ACCOUNT" ]]; then OPTS+=(--account="$SLURM_ACCOUNT"); fi
 if [[ -n "${SLURM_QOS:-}" ]]; then OPTS+=(--qos="$SLURM_QOS"); fi
 if [[ -n "$AFTER" ]]; then OPTS+=(--dependency="afterok:$AFTER"); fi
+if [[ "${NO_REQUEUE:-0}" == 1 ]]; then OPTS+=(--no-requeue); export MAX_REQUEUE=0; fi
 case "$ARRAY" in
   shard) OPTS+=(--array="0-$((NUM_SHARDS - 1))" --output="logs/slurm/%x-%A_%a.out") ;;
   fold)  OPTS+=(--array=0-5 --output="logs/slurm/%x-%A_%a.out") ;;   # 0..4 = fold, 5 = full

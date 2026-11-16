@@ -1,52 +1,66 @@
 #!/bin/bash
-# hpc/pipeline.sh - sottomette la catena completa di una run, con dipendenze afterok.
+# hpc/pipeline.sh - sottomette la run completa come catena di 4 job, con dipendenze afterok.
 #   RUN_NAME=site_v2 hpc/pipeline.sh              # seed da SEEDS (default "0 1 2")
-#   RUN_NAME=id_v2 SEEDS="0" hpc/pipeline.sh
+#   RUN_NAME=site_v2 hpc/pipeline.sh --redo-gate  # solo 50, 52, 55 di nuovo, con --overwrite (strada A, N27)
 # Il test NON viene valutato: lo stadio 50 gira senza --final (vedi hpc/final.sh).
+#
+# C14c-2 (N27): la QOS stud ammette 4 job in coda per utente e conta ogni elemento di un array, quindi
+# la catena del blueprint (circa 25 sottomissioni, piu' gli array di 10 e 20) non entra. Quattro job,
+# ognuno con piu' stadi in sequenza (hpc/submit.sh --chain):
+#   A  (CPU)  01 -> 00 -> 05 -> 10 -> 15 (diagnostico: se fallisce la catena va avanti)
+#   B1 (GPU)  25 -> 28 -> 40 -> 41 -> 20 per il primo seed          dopo A
+#   B2 (GPU)  20 per gli altri seed                                  dopo A, in parallelo a B1
+#   C  (CPU)  27 -> 30 -> (35 -> 45 -> 50 per seed) -> 52 -> 55      dopo B1 e B2
+# Con un solo seed B2 non c'e'. 55 entra solo se scripts/55_report.py esiste (C13b).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source hpc/env.sh
 : "${RUN_NAME:?RUN_NAME mancante}"
+REDO_GATE=0
+if [[ "${1:-}" == "--redo-gate" ]]; then REDO_GATE=1; shift; fi
+[[ $# -eq 0 ]] || { echo "pipeline: argomento sconosciuto: $1" >&2; exit 2; }
 mkdir -p logs
 PLAN="logs/pipeline_${RUN_NAME}_$(date +%Y%m%d_%H%M%S).txt"
-sub() {   # sub <etichetta> <argomenti di submit.sh>: stampa il job id, annota il piano
-  local label="$1" id; shift
-  id=$(hpc/submit.sh "$@")
-  printf '%-10s %-8s %s\n' "$id" "$label" "$*" >> "$PLAN"
+sub() {   # sub <nome> <stadi> [--after ID[:ID]]: stampa il job id, annota il piano
+  local name="$1" stages="$2" id; shift 2
+  id=$(hpc/submit.sh --chain "$name" "$stages" "$@")
+  printf '%-10s %-4s %-24s %s\n' "$id" "$name" "${2:-}" "$stages" >> "$PLAN"
   echo "$id"
 }
-
-# A - dati (CPU)
-j01=$(sub A 01)  # la conversione delle pose non dipende da nulla: l'inventario (00) la aspetta
-j00=$(sub A 00 --after "$j01")
-j05=$(sub A   05 --after "$j00")
-# B - frame (array CPU), feature di L1 (GPU), diagnostica dell'allineamento
-j10=$(sub B10 10 --after "$j00")
-sub B15 15 --after "$j00" > /dev/null      # diagnostico (legge data/clips.csv): non blocca la catena
-j25=$(sub B25 25 --after "$j10")
-# C - stadi che non dipendono dal seed di CamFormer
-j27=$(sub C   27 --after "$j25:$j05")
-j28=$(sub C   28 --after "$j10:$j05")
-j30=$(sub C   30 --after "$j25:$j05")
-j40=$(sub C   40 --after "$j00")
-j41=$(sub C   41 --after "$j00:$j40")   # legge data/clips.csv (00) e cost.json (40)
-# B20 + C per seed: CamFormer (array 0-5), fusione, cache, gate su val
-dep50=""
 read -r -a SEED_LIST <<< "$SEEDS"
-for s in "${SEED_LIST[@]}"; do
-  seed=(--set "camformer.seed=$s")
-  j20=$(sub "B20.s$s" 20 --after "$j01:$j05" -- "${seed[@]}")
-  j35=$(sub "C.s$s"   35 --after "$j20:$j30" -- "${seed[@]}")
-  j45=$(sub "C.s$s"   45 --after "$j35:$j40:$j28" -- "${seed[@]}")
-  j50=$(sub "C.s$s"   50 --after "$j45" -- "${seed[@]}")
-  dep50="${dep50:+$dep50:}$j50"
-done
-# aggregazione dei seed (solo con piu' seed) e report
-dep55="$dep50:$j27:$j41"
-if [[ ${#SEED_LIST[@]} -gt 1 ]]; then
-  j52=$(sub C 52 --after "$dep50" -- --seeds "${SEED_LIST[@]}")
-  dep55="$j52:$j27:$j41"
+[[ ${#SEED_LIST[@]} -gt 0 ]] || { echo "pipeline: SEEDS vuoto" >&2; exit 2; }
+seed() { echo "--set camformer.seed=$1"; }
+
+# parte di C che dipende dal seed, piu' aggregazione e report
+gate_part() {   # gate_part <argomenti aggiunti a 50 e 52>
+  local extra="$1" out="" s
+  for s in "${SEED_LIST[@]}"; do
+    out="$out; 50 $(seed "$s")${extra:+ $extra}"
+  done
+  if [[ ${#SEED_LIST[@]} -gt 1 ]]; then out="$out; 52 --seeds ${SEED_LIST[*]}${extra:+ $extra}"; fi
+  if [[ -f scripts/55_report.py ]]; then out="$out; 55"; fi
+  echo "${out#; }"
+}
+
+if [[ "$REDO_GATE" == 1 ]]; then
+  # strada A: 00-45 restano quelli della run; 50-55 si rifanno al commit attuale (verify_run lo accetta)
+  jg=$(sub G "$(gate_part --overwrite)")
+  echo "gate sottomesso di nuovo (job $jg). Piano: $PLAN"
+  cat "$PLAN"
+  exit 0
 fi
-j55=$(sub R 55 --after "$dep55")
-echo "catena sottomessa (ultimo job: $j55). Piano: $PLAN"
+
+jA=$(sub A "01; 00; 05; 10; 15?")
+jB1=$(sub B1 "25; 28; 40; 41; 20 $(seed "${SEED_LIST[0]}")" --after "$jA")
+depC="$jB1"
+if [[ ${#SEED_LIST[@]} -gt 1 ]]; then
+  b2=""
+  for s in "${SEED_LIST[@]:1}"; do b2="$b2; 20 $(seed "$s")"; done
+  jB2=$(sub B2 "${b2#; }" --after "$jA")
+  depC="$jB1:$jB2"
+fi
+c="27; 30"
+for s in "${SEED_LIST[@]}"; do c="$c; 35 $(seed "$s"); 45 $(seed "$s")"; done
+jC=$(sub C "$c; $(gate_part "")" --after "$depC")
+echo "catena sottomessa (ultimo job: $jC). Piano: $PLAN"
 cat "$PLAN"

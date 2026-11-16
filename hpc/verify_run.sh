@@ -16,19 +16,40 @@ FAIL=0
 ok()  { echo "  ok       $*"; }
 bad() { echo "  FALLITO  $*"; FAIL=1; }
 
-echo "1. un solo commit nei manifest degli stadi 00-52, uguale al clone"
-COMMITS=$(python3 - "$RUN_DIR" <<'PY'
+echo "1. commit dei manifest: uno solo per 00-45, uno solo (quello del clone) per 50-52"
+# Strada A (N27): gli stadi 50-55 si possono rifare dopo, a un commit piu' recente, con
+# hpc/pipeline.sh --redo-gate. Si accetta solo se il commit di 00-45 precede quello del clone e se
+# tra i due non cambia nessuno script degli stadi 00-45; le modifiche in src/ e configs/ si elencano
+# da controllare a mano (le chiavi di config cambiate le ferma gia' il manifest).
+read -r UP DOWN <<< "$(python3 - "$RUN_DIR" <<'PY'
 import json, pathlib, sys
-ms = sorted(pathlib.Path(sys.argv[1], "_manifest").glob("*.json"))
-ms = [m for m in ms if not m.name.startswith("55_")]      # il report si puo rigenerare dopo
-print(" ".join(sorted({str(json.loads(m.read_text()).get("commit", "unknown")) for m in ms})))
+up, down = set(), set()
+for m in sorted(pathlib.Path(sys.argv[1], "_manifest").glob("*.json")):
+    if m.name.startswith("55_"):          # il report si puo rigenerare dopo
+        continue
+    c = str(json.loads(m.read_text()).get("commit", "unknown"))
+    (down if m.name.startswith(("50_", "52_")) else up).add(c)
+print(",".join(sorted(up)) or "-", ",".join(sorted(down)) or "-")
 PY
-)
+)"
 HEAD=$(git rev-parse HEAD)
-if [[ -z "$COMMITS" ]]; then bad "nessun manifest in $RUN_DIR/_manifest"
-elif [[ "$COMMITS" == *" "* ]]; then bad "commit diversi nei manifest: $COMMITS"
-elif [[ "$HEAD" != "$COMMITS"* ]]; then bad "manifest al commit $COMMITS, clone a ${HEAD:0:7}"
-else ok "commit $COMMITS"; fi
+if [[ "$UP" == "-" ]]; then bad "nessun manifest degli stadi 00-45 in $RUN_DIR/_manifest"
+elif [[ "$UP" == *,* ]]; then bad "commit diversi nei manifest di 00-45: $UP"
+elif [[ "$DOWN" == *,* ]]; then bad "commit diversi nei manifest di 50-52: $DOWN"
+elif [[ "$DOWN" != "-" && "$HEAD" != "$DOWN"* ]]; then bad "manifest di 50-52 al commit $DOWN, clone a ${HEAD:0:7}"
+elif [[ "$DOWN" == "-" || "$UP" == "$DOWN" ]]; then
+  if [[ "$HEAD" == "$UP"* ]]; then ok "commit $UP"; else bad "manifest al commit $UP, clone a ${HEAD:0:7}"; fi
+elif ! git merge-base --is-ancestor "$UP" HEAD 2>/dev/null; then
+  bad "il commit di 00-45 ($UP) non precede quello del clone (${HEAD:0:7})"
+else
+  CHANGED=$(git diff --name-only "$UP" HEAD -- scripts/ | grep -v -E '^scripts/5[0-9]_' || true)
+  if [[ -n "$CHANGED" ]]; then bad "50-52 rifatti a ${HEAD:0:7}, ma da $UP sono cambiati script degli stadi 00-45: $(echo $CHANGED)"
+  else
+    ok "strada A: 00-45 al commit $UP, 50-52 al commit ${HEAD:0:7}"
+    OTHER=$(git diff --name-only "$UP" HEAD -- src/ configs/ | tr '\n' ' ')
+    if [[ -n "$OTHER" ]]; then echo "  info     da controllare (cambiati da $UP): $OTHER"; fi
+  fi
+fi
 
 echo "2. nessun Traceback nei log"
 TB=$(grep -rl "Traceback (most recent call last)" "$RUN_DIR/logs" 2>/dev/null | head -5)
