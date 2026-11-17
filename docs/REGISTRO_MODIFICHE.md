@@ -25,6 +25,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M15 | Epoche e patience di CamFormer (D3) | 30 epoche, patience 5 | Fold 0 e full al tetto con la perdita in calo | d134b40 (C08a) |
 | M16 | `results/` nel repository | Risultati solo sull'HPC e in un backup | Ogni numero del report ha run e commit | previsto dopo le run |
 | M17 | CamFormer dal checkpoint del paper, encoder congelato, si allena solo la testa; EgoVLP invariato (congelato, testa logistica) | v1: checkpoint con fine-tuning end-to-end; blueprint (M04): da zero | Decisione del gruppo (16/11): modelli pre-addestrati su molti più dati, si addestrano solo i classificatori. Limiti dichiarati in N24 | previsto (C14d) |
+| M18 | L0 e L1 da `scenario_preds` (teste logistiche su CamFormer ed EgoVLP congelati, 6 classi, 3 seed), cache del gate dallo stadio 44 al posto di 00–45; divisione ufficiale con la val tagliata a metà (val/test) | Stadi 00–45 di cascade-v2, divisione per sito (M02/M03) | Il controllo su L0 della run `site_v2` è fallito (siti mai visti per CamFormer congelato); la divisione per sito resta analisi secondaria. Dettagli in N28–N31 | previsto (C15) |
 
 ## Note di lavorazione
 
@@ -378,3 +379,65 @@ come il `chain.sbatch` della v1.
   Scelta presa: si tengono (`keep`, nessuna modifica). Con l'encoder congelato (M17) entrano solo nell'addestramento
   della testa lineare: 3 esempi con un contesto più corto, nessuno in val o test. Alternativa scartata: `drop`, cioè
   addestrare solo su finestre piene come il pretraining di `egoexo4d_dur8.pt`.
+
+**N28 — C15: gate sulle predizioni di `scenario_preds`, stadio ponte 44, 6 classi (17/11).** Decisione del gruppo
+del 17/11 (pomeriggio): L0 e L1 vengono dal pacchetto `scenario_preds` di Giorgio (M18); di `cascade-v2` restano
+costi (40), gate e valutazione (50).
+- `configs/labels.yaml` a 6 classi, nell'ordine delle teste di `scenario_preds`: Basketball, Dance, Soccer, Cooking,
+  Health, Bike repair. Music (0 take) e Bouldering (2 take) fuori (come M14). `mock.py` a 6 classi. Lo stadio 00 con
+  il CSV di CamFormer a 8 scenari non si usa più: `test_real_scenario_csv_mapping_by_name` è saltato con il motivo;
+  i conteggi di `test_converted_inventory` scendono da 46 a 34 take sintetiche (quelle di Music e Bouldering escono).
+- Nuovo `scripts/44_scenario_bridge.py`: scrive `45_cache/<variante>/cache.parquet` con lo stesso schema e lo stesso
+  manifest dello stadio 45 (lo stadio 50 non cambia). Probabilità = `cam_p_*`/`vid_p_*` di `predictions.csv` (già
+  calibrate dalla testa), logit = log delle probabilità, `T = 1`; fusione `replace` (`fused_probs` = L1, `w = 0`);
+  `fold` = `fold_s0` sul train, −1 altrove; embedding da `features/*.npz`; `mot_*` dalle traiettorie `traj/*.npz`
+  (solo campioni validi) nelle stesse finestre delle embedding, mediate; costi dello stadio 40 × numero di finestre.
+  Il test entra solo con `--include-test` (da `sealed/predictions.csv`), al passo finale; senza, 44 si rifiuta di
+  girare se `predictions.csv` contiene righe del test.
+- Take senza embedding CamFormer (audit 17/11, punto 3): fuori dalla cache, elencate in `no_l0.csv` con la
+  correttezza di L1. Regola fissata ora: nel risultato finale vanno a EgoVLP e si contano come costo L0 + L1
+  (accuratezza e costo della cascata si correggono con queste take prima di riportarli).
+- Punto di lavoro (stadio 50): nuova chiave `gate.operating_rule`. `within_pts` (default di questa run) = quota di
+  escalation minima con accuratezza su val ≥ accuratezza di always_L1 su val − `within_pts` (0,01); se nessuna quota
+  basta, tutto a L1. `budget` = la regola di prima (50% del costo di always_L1). Con `within_pts` la colonna
+  `budget_frac` del punto di lavoro vale −1 (lo stadio 52 raggruppa per quella colonna e scarterebbe i NaN). I budget
+  25% e 50% e la curva completa restano nei risultati come confronto.
+- `gate.bacc_min_takes` da 5 a 1: una classe esce dall'accuratezza bilanciata solo con 0 take (come in N29).
+- Lancio: `configs/hpc/scenario_v1.yaml`, `hpc/gate_scenario.sh` (un job CPU: 40 → 44 → 50, senza `--final`).
+  Lo stadio 52 non serve: la media sui seed è già dentro `scenario_preds`.
+- Test: `tests/test_stage_44.py` (schema, take senza L0, Bouldering fuori, costi × finestre, test sigillato,
+  catena 44 → 50 anche con `--final`, classi in ordine diverso, righe del test in `predictions.csv`);
+  `test_operating_point_within_pts_on_val` e `test_stage_50_without_final` controllano la nuova regola.
+
+**N29 — Modifiche a `scenario_preds` per l'audit del 17/11 (passo A).** Config di default allineata al piano del
+pomeriggio: `split.official_val.mode = split` (val ufficiale tagliata una volta a metà, per sessione e stratificata
+per classe, `test_frac` 0,5, seed 0). Controllo su L0 (`check`): sulla val accuratezza bilanciata ≥ 0,40 e limite
+inferiore dell'intervallo bootstrap 95% (per sessione) sopra il caso; sul train fuori campione richiamo > 0 per ogni
+classe; nuovo `require_all_classes`: fallisce se una delle 6 classi ha 0 take nella val o nel train
+(`heads.min_takes_metric = 1`: una classe esce dall'accuratezza bilanciata solo con 0 take). Take senza embedding
+CamFormer: restano nelle predizioni con `cam_pred` vuoto, contate (`n_no_embedding`); `feat-camformer` si ferma solo
+oltre il 10% (`camformer.max_missing_frac`). Assi delle pose: due varianti pre-registrate, identità (default) e
+diag(−1, −1, 1); con 1, 3 e 5 finestre fanno 6 candidate (`hpc/candidates.sh`), e il nuovo stadio `select` sceglie
+sulla val la massima accuratezza bilanciata di CamFormer (a parità meno finestre, poi identità); EgoVLP usa lo stesso
+numero di finestre. `check-up` resta solo diagnosi. 18 test (15 di Giorgio + 3).
+
+**N30 — Correzione di N24, punto (2).** La differenza dal pretraining non è la frequenza (20 Hz contro 1 kHz: il
+pretraining usa comunque traiettorie ricampionate a 20 Hz) ma il sistema di riferimento: le nostre pose sono quelle
+della camera RGB (estrinseche dei JSON), il pretraining usa la traiettoria del dispositivo Aria. Per questo la
+correzione degli assi è una scelta pre-registrata sulla val (N29) e non un valore fisso.
+
+**N31 — Limiti da dichiarare e analisi decise prima della run (17/11).**
+- Variante delle pose e finestre si scelgono sulla stessa val su cui si fa il controllo su L0: il controllo è un po'
+  ottimistico; il test resta intatto.
+- Il gate impara sulle probabilità fuori campione del train, che in `scenario_preds` sono la media di 3 seed (un
+  modello per seed), e si applica a val e test, che sono la media di 15 modelli (5 fold × 3 seed): probabilità meno
+  estreme. Il punto di lavoro si sceglie sulla val, quindi sulla stessa distribuzione a cui si applica.
+- Il pretraining di CamFormer ha visto le take del train ufficiale (N24): le probabilità OOF del train possono essere
+  troppo sicure. Si riportano i risultati separati per `camformer_pretrain`.
+- Val e test sono piccoli (circa 140 take ciascuno: 1 punto ≈ 1,4 take): accuratezza e costo della cascata con
+  intervallo bootstrap per take/sessione.
+- Sessioni in comune tra train e val/test (log di `index`): risultato principale su tutte le take, più un'analisi di
+  controllo senza quelle sessioni.
+- Analisi aggiuntive, solo valutazione (il gate non cambia): accuratezza di CamFormer per fasce di movimento della
+  camera (`mot_*`) sul train fuori campione, in totale e dentro ogni classe; confronto con la regola fissa
+  «classe procedurale prevista da L0 → EgoVLP».

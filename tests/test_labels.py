@@ -11,8 +11,8 @@ REAL_CSV = REPO_ROOT / "third_party/seeing_without_pixels/data_files/egoexo4d/sc
 
 def test_labels_order_and_kinds():
     lab = load_labels()
-    assert lab.num_classes == 8
-    assert lab.names[0] == "Basketball" and lab.names[5] == "Bouldering"
+    assert lab.num_classes == 6  # N28: Music e Bouldering fuori
+    assert lab.names == ("Basketball", "Dance", "Soccer", "Cooking", "Health", "Bike repair")
     procedural = {n for n, p in zip(lab.names, lab.procedural_mask) if p}
     assert procedural == {"Cooking", "Health", "Bike repair"}
 
@@ -26,7 +26,10 @@ def test_assert_class_order():
         assert_num_classes(np.zeros((3, 7)), lab, where="x")
 
 
-@pytest.mark.skipif(not REAL_CSV.exists(), reason="submodule CamFormer assente")
+@pytest.mark.skip(
+    reason="N28: labels.yaml ha 6 classi, il CSV di CamFormer anche Music e Rock Climbing; "
+    "le take ora vengono da scenario_preds (stadio 44), lo stadio 00 non si usa"
+)
 def test_real_scenario_csv_mapping_by_name():
     lab = load_labels()
     df = load_scenario(REAL_CSV, lab)

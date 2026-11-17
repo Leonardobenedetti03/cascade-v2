@@ -68,8 +68,9 @@ def test_stage_50_without_final(syn_root, monkeypatch):
         assert "test" not in set(pd.read_csv(d / f"{k}.csv").split), k
     assert "test" not in set(pd.read_parquet(d / "scores.parquet").split)
     op = pd.read_csv(d / "operating_point.csv")
-    b = op[(op.split == "val") & (op.point == "budget") & ~op.model.isin(["always_L1"])]
-    assert (b.cost_frac_L1 <= 0.5 + 1e-6).all()
+    b = op[(op.split == "val") & (op.point == "budget") & ~op.model.isin(["always_L0", "always_L1", "random"])]
+    ref = op[(op.split == "val") & (op.point == "budget") & (op.model == "always_L1")].acc.iloc[0]
+    assert len(b) and (b.acc >= ref - 0.01 - 1e-9).all()  # N28: entro 1 punto da always_L1 su val
     _script("50_gate_eval.py").main(_argv("t50a", *MOCK))  # secondo giro senza --final: salta
 
 

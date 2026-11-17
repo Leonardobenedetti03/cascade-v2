@@ -234,6 +234,7 @@ class GateCfg:
     bacc_min_takes: int = 5  # accuratezza bilanciata: classi con almeno tante take nello split (M14)
     transfer_budgets: List[float] = field(default_factory=lambda: [0.25, 0.5])  # soglie val → test (RQ1)
     operating_budget: float = 0.5
+    operating_rule: str = "budget"  # budget | within_pts (N28: minimo costo entro within_pts da always_L1 su val)
     bootstrap: int = 1000
     bootstrap_seed: int = 0
     comparisons: List[List[str]] = field(default_factory=list)  # coppie [A, B] per A − B (RQ2)
@@ -466,6 +467,8 @@ def validate_config(cfg: Config) -> None:
         e.append("fusion.w_grid_step in (0, 1]")
     _one_of(e, "cost.counter", cfg.cost.counter, ["fvcore", "torch", "analytic"])
     _one_of(e, "gate.logreg_class_weight", g.logreg_class_weight, ["balanced", "none"])
+    if g.operating_rule not in ("budget", "within_pts"):
+        e.append("gate.operating_rule: budget | within_pts")
     if not all(0 < b <= 1 for b in g.budgets) or not 0 < g.operating_budget <= 1:
         e.append("gate.budgets e gate.operating_budget in (0, 1]")
     if not 1 <= g.r_step <= 100:

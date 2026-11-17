@@ -37,7 +37,7 @@ def test_finetune_fold_on_synthetic(syn_root, monkeypatch):
     folds = pd.read_csv(syn_root / "runs" / "t" / "splits" / "folds.csv")
     fold_of = dict(zip(folds.take_uid, folds.fold))
     assert {fold_of[t] for t in oof.df.take_uid} == {1}  # solo clip della fold 1
-    assert oof.arrays["cam_probs_cal"].shape[1] == 8
+    assert oof.arrays["cam_probs_cal"].shape[1] == 6  # N28
     assert oof.meta["class_names"][0] == "Basketball"
     val = read_table(out / "preds_val.parquet")
     assert set(val.df.split) == {"val"}

@@ -40,9 +40,12 @@ gate:
   budgets: [0.25, 0.5]           # frazioni del costo di always_L1
   within_pts: 0.01               # "entro 1 punto da always_L1"
   improvement_deltas: [0.0, 0.01]  # I(δ) = C_L1 / C(r*_δ): costo minimo per stare entro δ da always_L1
-  bacc_min_takes: 5              # accuratezza bilanciata: classi con almeno 5 take nello split
+  bacc_min_takes: 1              # accuratezza bilanciata: una classe esce solo con 0 take nello split (N28)
   transfer_budgets: [0.25, 0.5]  # RQ1: soglia scelta su val per questi budget, applicata al test
-  operating_budget: 0.5          # punto di lavoro scelto su val
+  operating_budget: 0.5          # punto di lavoro con operating_rule = budget
+  # Punto di lavoro scelto su val (N28): within_pts = quota di escalation minima con accuratezza su val
+  # >= accuratezza di always_L1 su val − within_pts; budget = costo <= operating_budget × costo di always_L1.
+  operating_rule: within_pts
   bootstrap: 1000
   bootstrap_seed: 0
   # CompareConfidence (M06): P(c1 = 1 | z) con regressione logistica, senza pesi di classe

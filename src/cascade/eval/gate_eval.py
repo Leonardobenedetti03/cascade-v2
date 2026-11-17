@@ -221,22 +221,30 @@ class SplitData:
 
 # --------------------------------------------------------------------------- punto di lavoro
 def choose_operating_points(table, results, gcfg) -> Tuple[Dict[str, List[float]], Dict[str, float]]:
-    """Su val: per ogni gate e seed la soglia che rispetta ``operating_budget``; per l'oracolo
-    (score discreti) la quota r* corrispondente."""
+    """Su val: per ogni gate e seed la soglia del punto di lavoro; per l'oracolo (score discreti)
+    la quota r* corrispondente. ``operating_rule``: ``budget`` = quota massima con costo
+    <= ``operating_budget`` × costo di always_L1; ``within_pts`` (N28) = quota minima con
+    accuratezza >= accuratezza di always_L1 − ``within_pts`` (se nessuna, tutto a L1)."""
     val = SplitData.build(table, "val", gcfg.bacc_min_takes)
     thresholds: Dict[str, List[float]] = {}
     rates: Dict[str, float] = {}
     if not len(val.rows):
         return thresholds, rates
-    _, ref_cost, _ = val.masks_eval(np.ones(len(val.rows), bool))
+    ref_corr, ref_cost, _ = val.masks_eval(np.ones(len(val.rows), bool))
     budget = gcfg.operating_budget * float(ref_cost.mean())
+    rule = getattr(gcfg, "operating_rule", "budget")
+    target_acc = float(ref_corr.mean()) - gcfg.within_pts
     for name, res in results.items():
         thresholds[name] = []
         for gr in res:
             sc = gr.scores[val.rows]
             c = cascade_curve(sc, **val.curve_args, r_step=gcfg.r_step, fixed_r=gr.fixed_r)
-            ok = c.mean_cost <= budget * (1 + 1e-9)
-            r_idx = int(np.flatnonzero(ok)[-1]) if ok.any() else 0
+            if rule == "within_pts":
+                ok = c.correct.mean(axis=-1) >= target_acc - 1e-12
+                r_idx = int(np.flatnonzero(ok)[0]) if ok.any() else len(c.r) - 1
+            else:
+                ok = c.mean_cost <= budget * (1 + 1e-9)
+                r_idx = int(np.flatnonzero(ok)[-1]) if ok.any() else 0
             k = int(round(c.r[r_idx] / 100.0 * len(val.rows)))
             ranked = sc[np.argsort(escalation_order(sc))]
             thresholds[name].append(float(ranked[k - 1]) if k > 0 else float("inf"))
@@ -281,7 +289,10 @@ def operating_rows(results, thresholds, rates, sd: SplitData, ref_cost_L1: float
             escalate_at_operating_point(name, gr, thr, rates.get(name, 0.0), sd)
             for gr, thr in zip(res, thresholds[name])
         ]
-        op_rows.append(row(name, "budget", float(np.mean(thresholds[name])), gcfg.operating_budget, escs))
+        # punto "budget" = punto di lavoro scelto su val; con operating_rule = within_pts budget_frac = -1 (N28:
+        # niente NaN, perché lo stadio 52 raggruppa per budget_frac e pandas scarterebbe i NaN)
+        op_budget = gcfg.operating_budget if getattr(gcfg, "operating_rule", "budget") == "budget" else -1.0
+        op_rows.append(row(name, "budget", float(np.mean(thresholds[name])), op_budget, escs))
         if name.startswith("compare_") and res[0].fixed_r is None:  # soglia naturale: L1 più probabile di L0
             op_rows.append(row(name, "s>0", 0.0, float("nan"), [gr.scores[sd.rows] > 0 for gr in res]))
         per_class = [

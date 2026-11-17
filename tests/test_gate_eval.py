@@ -90,10 +90,12 @@ def test_oracle_beats_everything_on_both_series(res_final):
             assert v["oracle"] >= v.drop("oracle").max() - 1e-9, (split, key)
 
 
-def test_operating_point_respects_budget_on_val(res_final):
+def test_operating_point_within_pts_on_val(res_final):
+    """N28: punto di lavoro = costo minimo con accuratezza su val entro within_pts da always_L1."""
     op = res_final["operating_point"]
     v = op[(op.split == "val") & (op.point == "budget") & op.model.isin(NON_FIXED)]
-    assert len(v) and (v.cost_frac_L1 <= 0.5 + 1e-6).all()
+    ref = op[(op.split == "val") & (op.point == "budget") & (op.model == "always_L1")].acc.iloc[0]
+    assert len(v) and (v.acc >= ref - 0.01 - 1e-9).all() and (v.budget_frac == -1).all()
     nat = op[(op.point == "s>0")]
     assert set(nat.model) == {"compare_A", "compare_AC"}  # solo i gate compare hanno una soglia naturale
 

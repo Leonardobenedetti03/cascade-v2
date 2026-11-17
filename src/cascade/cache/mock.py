@@ -23,8 +23,8 @@ from src.cascade.labels import Labels
 from src.cascade.motion import MOTION_FEATURES
 from src.data.cache import Table
 
-# Frequenze approssimate delle classi in scenario_cls.csv (ordine di labels.yaml).
-CLASS_PRIOR = np.array([909, 728, 276, 249, 676, 1401, 396, 359], dtype=float)
+# Frequenze approssimate delle classi in scenario_cls.csv (ordine di labels.yaml, 6 classi: N28).
+CLASS_PRIOR = np.array([909, 728, 249, 676, 396, 359], dtype=float)
 
 
 def _softmax(z: np.ndarray) -> np.ndarray:
