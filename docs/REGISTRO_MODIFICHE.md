@@ -454,3 +454,28 @@ ricampionando le sessioni, anche della differenza di accuratezza da always_L1; (
 train), in totale e per classe, con figura. Gira in `hpc/gate_scenario.sh` dopo lo stadio 50. Il gate non cambia.
 Test: `test_analysis_53` e la catena finale in `test_bridge_cache_and_gate` (`tests/test_stage_44.py`).
 
+**N33 — Risultati di val congelati prima del test (17/11, sera).** Run `scenario_preds` `official_v2` (commit
+`ebbf20a` di cascade-v2 per il gate) e gate `scenario_v1`. Nessun numero del test è stato guardato; dopo questa voce
+non si cambia più nulla del metodo e il test si valuta una volta sola.
+- Candidate (stadio `select`, bacc di CamFormer sulla val, 143 take): identità con 5 finestre 0,824 (CI 0,759–0,914),
+  identità 3 finestre 0,790, diag(−1,−1,1) 5 finestre 0,789, identità 1 finestra 0,679, diag 3 finestre 0,659,
+  diag 1 finestra 0,566. Scelta: **identità, 5 finestre**.
+- Indice: 1273 take; val 143 e test 142 dalla val ufficiale, tutte e 6 le classi da entrambe le parti (Soccer 7 in
+  val); 19 sessioni in comune tra train e val/test (160 take su 285), di cui 10 sessioni e 85 take nella val.
+- Controllo su L0 superato: bacc val 0,824 (CI 0,759–0,914) contro caso 0,167; nessuna classe sotto soglia o
+  mancante; 0 take senza embedding. CamFormer: acc 0,924 / bacc 0,861 sul train fuori campione, acc 0,909 sulla val.
+  EgoVLP: acc e bacc 1,000 sia sul train fuori campione sia sulla val (L1 al tetto).
+- Gate, punto di lavoro sulla val (entro 1 punto da always_L1 = 1,000): tutti i gate appresi e a soglia hanno
+  acc 0,993 (1 errore su 143) e bacc 0,983; costo rispetto ad always_L1: lgbm_ABC 0,255, logreg_ABC 0,274,
+  logreg_AC 0,281, thr_maxprob/thr_entropy/logreg_A/compare_A/compare_AC 0,288, thr_margin 0,302; oracolo 0,092;
+  random 0,895 (acc 0,993). Regola `rule_procedural`: acc 0,979, costo 0,246 (non rispetta il criterio).
+  Differenza di accuratezza da always_L1 (bootstrap per sessione, 37 sessioni): da −0,025 a 0 per i gate.
+- Senza le sessioni in comune (58 take di val): CamFormer acc 0,810; ai punti di lavoro scelti su tutta la val i gate
+  hanno acc 0,983 con costo 0,51–0,59 (lgbm_ABC 0,512).
+- Moto (train fuori campione, quintili di `mot_energy`): acc di L0 0,74 nel quintile più basso contro 0,95–0,99
+  negli altri; dentro la classe sale con il moto per Basketball (0,84 → 0,98), Cooking (0,68 → 0,90), Bike repair
+  (0,63 → 1,00); Health va al contrario ma con 7 take nel secondo quintile.
+- `camformer_pretrain`: tutte le 143 take di val sono nella val del pretraining di CamFormer (non nel suo train).
+- Limite: il punto di lavoro è scelto e misurato sulla stessa val ed è al bordo (1 errore): sul test può cambiare
+  di una take in più o in meno.
+
