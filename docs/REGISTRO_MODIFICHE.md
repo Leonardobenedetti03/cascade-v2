@@ -497,3 +497,15 @@ esclusi da `.gitignore`).
   modo significativo il gate rispetto alla sola confidenza di CamFormer; i gate con il gruppo C scalano 3–5 take in
   meno sia su val sia su test (tendenza, non prova).
 
+
+**N35 — Figure del report (17/11, notte).** Nuovo `scripts/60_figures.py` (commit 2e66d57): legge solo
+`results/scenario_v1/` (nessun calcolo nuovo, metodo e numeri invariati dopo N34) e scrive PDF e PNG in
+`results/scenario_v1/figures/`.
+- `fig1_accuracy_cost`: accuratezza contro costo (% di always_L1) su val e test; curve di lgbm_ABC, thr_maxprob e
+  random (media sui semi), punti di always_L0, always_L1, oracolo e `rule_procedural` da `53_analysis/op_all.csv`;
+  cerchiato il punto di lavoro di lgbm_ABC.
+- `fig2_escalation_by_class`: quota di take mandate a EgoVLP per classe (lgbm_ABC), val e test.
+- `fig3_motion_l0`: acc di CamFormer per quintile di `mot_energy` (train fuori campione), asse x a numeri interi;
+  per le singole classi solo i quintili con almeno 10 take.
+- Nota per il report: sul test thr_maxprob arriva ad acc 1,000 con meno costo di lgbm_ABC; il punto di lavoro resta
+  quello scelto sulla val (N33), coerente con RQ2 non significativa (N34).
