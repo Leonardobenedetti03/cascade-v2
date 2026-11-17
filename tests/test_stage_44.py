@@ -59,7 +59,8 @@ def fake_scenario_run(d: Path, n_windows: int = 3, seed: int = 0) -> Path:
                     "take_uid": f"uid{i}",
                     "take_name": take,
                     "site": "s",
-                    "session": f"{take}_sess",
+                    # metà delle sessioni (j pari) è in comune tra train e val/test
+                    "session": f"{name}_{j}" if j % 2 == 0 else f"{take}_sess",
                     "split": split,
                     "fold": (i % 5) if split == "train" else -1,
                     "fold_s0": (i % 5) if split == "train" else -1,
@@ -87,7 +88,9 @@ def fake_scenario_run(d: Path, n_windows: int = 3, seed: int = 0) -> Path:
     df = pd.DataFrame(rows)
     df[df.split != "test"].to_csv(d / "predictions.csv", index=False)
     df[df.split == "test"].to_csv(d / "sealed" / "predictions.csv", index=False)
-    df.assign(duration_s=30.0)[["take_uid", "take_name", "duration_s"]].to_csv(d / "index" / "takes.csv", index=False)
+    df.assign(duration_s=30.0)[["take_uid", "take_name", "duration_s", "session", "camformer_pretrain"]].to_csv(
+        d / "index" / "takes.csv", index=False
+    )
     for m, e in (("camformer", cam), ("egovlp", vid)):
         np.savez(d / "features" / f"{m}.npz", take_name=np.array(list(e)), X=np.stack(list(e.values())))
     cfg = {
@@ -158,6 +161,37 @@ def test_bridge_cache_and_gate(env):
     _script("50_gate_eval.py").main(_gate_argv("--final"))
     assert (gdir / "FINAL_DONE").exists()
     assert "test" in set(pd.read_csv(gdir / "operating_point.csv").split)
+    _script("53_scenario_analysis.py").main(_argv("--final", "--n-boot", "50"))
+    assert "test" in set(pd.read_csv(rd / "53_analysis" / vdir.name / "main" / "op_all.csv").split)
+
+
+def test_analysis_53(env):
+    """N32: take senza L0 contate come L1, sessioni in comune, bootstrap per sessione, regola procedurale, moto."""
+    rd, scen = env
+    _script("44_scenario_bridge.py").main(_argv("--scenario-run", str(scen)))
+    _script("50_gate_eval.py").main(_gate_argv())
+    with pytest.raises(RuntimeError, match="FINAL_DONE"):
+        _script("53_scenario_analysis.py").main(_argv("--final"))
+    _script("53_scenario_analysis.py").main(_argv("--n-boot", "50"))
+    (out,) = list((rd / "53_analysis").glob("seed*_hz*/main"))
+    op = pd.read_csv(out / "op_all.csv")
+    assert set(op.split) == {"val"} and {"always_L1", "rule_procedural", "logreg_AC"} <= set(op.model)
+    l1 = op[op.model == "always_L1"].iloc[0]
+    assert l1.n_no_l0 == 1 and l1.n_takes == 60 and l1.cost_frac_L1 == pytest.approx(1.0)  # 59 in cache + 1 senza L0
+    l0 = op[op.model == "always_L0"].iloc[0]
+    assert l0.escalation_rate == pytest.approx(1 / 60)  # solo la take senza L0 va a L1
+    nosh = pd.read_csv(out / "op_no_shared.csv")
+    assert set(nosh.n_takes) == {30}  # metà delle take di val ha una sessione propria
+    boot = pd.read_csv(out / "op_boot.csv")
+    assert {"acc", "cost_frac_L1", "acc_minus_always_L1"} == set(boot.metric) and (boot.lo <= boot.hi).all()
+    rule = op[op.model == "rule_procedural"].iloc[0]
+    assert 0.4 < rule.escalation_rate < 0.7  # circa le take previste procedurali
+    pre = pd.read_csv(out / "by_pretrain.csv")
+    assert set(pre.subset) == {"camformer_pretrain=True", "camformer_pretrain=False"}
+    mot = pd.read_csv(out / "motion_l0.csv")
+    assert set(mot.quintile) == {1, 2, 3, 4, 5} and (out / "motion_l0.png").exists()
+    summ = json.loads((out / "summary.json").read_text())
+    assert summ["n_no_l0"] == {"val": 1} and summ["n_takes_shared"]["val"] == 30
 
 
 def test_bridge_rejects_wrong_classes(env):

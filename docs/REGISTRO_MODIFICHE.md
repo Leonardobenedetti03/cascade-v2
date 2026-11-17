@@ -441,3 +441,16 @@ correzione degli assi è una scelta pre-registrata sulla val (N29) e non un valo
 - Analisi aggiuntive, solo valutazione (il gate non cambia): accuratezza di CamFormer per fasce di movimento della
   camera (`mot_*`) sul train fuori campione, in totale e dentro ogni classe; confronto con la regola fissa
   «classe procedurale prevista da L0 → EgoVLP».
+
+**N32 — C16: analisi del gate decise prima della run (N31), stadio 53.** Lo stadio 50 scrive in `scores.parquet`,
+per ogni gate, la decisione al punto di lavoro (`esc__<gate>`, quota dei seed che scalano) e, se ci sono, sessione,
+sito, `camformer_pretrain` e costi. Il nuovo `scripts/53_scenario_analysis.py` (solo val; il test con `--final`, dopo
+50 `--final`) calcola, al punto di lavoro: (1) accuratezza, accuratezza bilanciata e costo **contando le take senza
+L0** di `no_l0.csv` come mandate a EgoVLP con costo L0 + L1 (regola di N28); (2) lo stesso senza le sessioni che
+compaiono anche nel train (nella run vera 19 sessioni, 160 take di val+test su 285); (3) intervalli bootstrap 95%
+ricampionando le sessioni, anche della differenza di accuratezza da always_L1; (4) la regola fissa
+`rule_procedural` (scala se la classe prevista da L0 è procedurale); (5) i risultati separati per
+`camformer_pretrain`; (6) l'accuratezza di L0 sul train fuori campione per quintili di `mot_energy` (soglie dal
+train), in totale e per classe, con figura. Gira in `hpc/gate_scenario.sh` dopo lo stadio 50. Il gate non cambia.
+Test: `test_analysis_53` e la catena finale in `test_bridge_cache_and_gate` (`tests/test_stage_44.py`).
+

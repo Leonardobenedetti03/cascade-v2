@@ -842,10 +842,18 @@ def evaluate(table, labels, cfg, *, final: bool) -> Dict[str, object]:
         for f, v in gr.importance.items()
     ]
     score_cols = {f"score__{n}__s{gr.seed}": gr.scores for n, res in results.items() for gr in res}
-    scores = pd.concat(
-        [table.df[["clip_id", "take_uid", "split", "fold", "label_idx", "c0", "c1", "y"]], pd.DataFrame(score_cols)],
-        axis=1,
-    )
+    # N32: decisione al punto di lavoro per clip (quota dei seed che scalano), per le analisi dello stadio 53
+    for n, res in (results.items() if thresholds else []):
+        col = np.full(len(table), np.nan)
+        for sd in sds.values():
+            escs = [
+                escalate_at_operating_point(n, gr, thr, rates.get(n, 0.0), sd) for gr, thr in zip(res, thresholds[n])
+            ]
+            col[sd.rows] = np.mean(escs, axis=0)
+        score_cols[f"esc__{n}"] = col
+    base = ["clip_id", "take_uid", "split", "fold", "label_idx", "c0", "c1", "y", "gmacs_L0", "gmacs_L1"]
+    base += [c for c in ("session", "site", "camformer_pretrain") if c in table.df.columns]
+    scores = pd.concat([table.df[base].reset_index(drop=True), pd.DataFrame(score_cols)], axis=1)
     if not final:  # senza --final non esce nulla del test, nemmeno gli score
         scores = scores[scores.split != "test"].reset_index(drop=True)
     res_tables = {k: pd.DataFrame(v) for k, v in out.items()}
