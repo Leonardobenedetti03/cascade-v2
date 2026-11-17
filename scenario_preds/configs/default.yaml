@@ -1,0 +1,125 @@
+# Configurazione unica. ${VAR} si espande con le variabili d'ambiente (vedi hpc/env.sh).
+# Override da riga di comando: --set sezione.chiave=valore (solo chiavi esistenti).
+
+run_dir: ${SCENARIO_RUN_DIR}
+
+data:
+  # Le due metà del subset, ognuna con split_manifest.csv, annotations/ e takes/.
+  roots:
+    - /home/3185472/egoexo4d_split_45G_physical
+    - /home/3218863/Oasis_Deep_Vision_DSBA/egoexo4d_split_45G
+  # Stream RGB Aria a 448 px: il prefisso varia (aria01, aria02, aria, aria1), 214-1 è sempre l'RGB.
+  video_glob: "takes/{take_name}/frame_aligned_videos/downscaled/448/*214-1*.mp4"
+  # Traiettoria del device (MPS, 1 kHz): è la sorgente su cui CamFormer è pre-addestrato.
+  aria_csv_pattern: "${ARIA_TRAJ_ROOT}/{take_name}/trajectory/closed_loop_trajectory.csv"
+  max_missing_frac: 0.02      # take perse (video o pose) oltre cui uno stadio si ferma
+  expected_takes: 1273        # index si ferma se il conteggio è diverso (null = nessun controllo)
+  expected_gap_takes: 52      # solo per il log di traj: take con frame mancanti nei JSON (19 + 33 dal report)
+
+labels:
+  # Classi della testa, in quest'ordine. Music (0 take) e Bouldering (2 take) restano fuori
+  # dall'addestramento; le take di Bouldering ricevono comunque una predizione, marcata.
+  classes: [Basketball, Dance, Soccer, Cooking, Health, Bike repair]
+
+split:
+  mode: official              # official (colonna split dei manifest) | site (analisi secondaria: val = fair + nus, test = georgiatech)
+  # Taglio della val ufficiale in val e test, per sessione e stratificato per classe (solo mode: official).
+  # mode: undecided (index gira, heads no) | split (quota test_frac al test) | all_test (opzione C: niente val,
+  # il gate si calibra sul train fuori campione) | all_val. DA FISSARE NEL REGISTRO PRIMA DELLA RUN.
+  # Registro (17/11 pomeriggio, sostituisce l'opzione C del mattino): opzione A, la val ufficiale (285 take)
+  # si taglia una volta a metà, per sessione e stratificata per classe: metà val, metà test.
+  # Varianti delle pose, finestre e punto di lavoro del gate si scelgono sulla val.
+  official_val:
+    mode: split
+    test_frac: 0.5
+    seed: 0
+  val_sites: [fair, nus]
+  test_sites: [georgiatech]
+  # Fold per sito (mode: site): stessa mappa di cascade v2 (splits/site_v1/split.json).
+  site_to_fold: {uniandes: 0, unc: 1, sfu: 2, cmu: 3, iiith: 3, minnesota: 3, indiana: 4, upenn: 4, utokyo: 4}
+  n_folds: 5                  # mode: official -> StratifiedGroupKFold per sessione
+  fold_seeds: [0, 1, 2]       # una partizione in fold per seed; le probabilità si mediano sui seed
+
+window:
+  length_s: 8.0               # finestra su cui si fa il pooling (CamFormer) e si campionano i frame (EgoVLP)
+  n_windows: 1                # finestre per take; le embedding si mediano sulla take
+  placement: center           # center (attorno al centro) | uniform (K parti uguali della take)
+
+poses:
+  source: pose_json           # pose_json (estrinseche della camera RGB, scelta del piano) | aria_csv (traiettoria del device)
+  fallback_to_json: false     # true: take senza CSV -> pose_json (sorgenti miste, registrato in status.csv)
+  fps: 20.0                   # frequenza attesa da CamFormer (1 kHz / 50)
+  json_src_fps: 30.0          # pose_json: frame i = i / 30 s nel tempo del video
+  json_max_gap_frames: 15     # pose_json: buchi più lunghi (0,5 s) -> campioni non validi
+  # pose_json: R_world_device = json_world_rotation @ R_world_cam @ json_cam_to_device.
+  # Default: la conversione OpenCV (x dx, y giù, z avanti) -> Aria (x sx, y su, z avanti) che il paper
+  # applica alle pose non Aria (supp. 2.3). Verificare il rollio con:  python -m scenario check-up
+  # (o con check-frame se ci sono pose vere del device).
+  # Registro (17/11, audit punto 1): due varianti pre-registrate, scelte sulla val con lo stadio select
+  # (accuratezza bilanciata di CamFormer sulla val; a parità vince l'identità):
+  #   identità (default, come cascade-v2)  e  diag(-1,-1,1) = [[-1,0,0],[0,-1,0],[0,0,1]]
+  #   (la conversione OpenCV -> Aria che il codice ufficiale di CamFormer NON applica alle pose non Aria).
+  # check-up resta solo una diagnosi (assume la y del dispositivo verso l'alto, non verificato).
+  json_cam_to_device: [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  json_world_rotation: [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+
+camformer:
+  repo: ${CAMFORMER_REPO}     # clone di github.com/google-deepmind/seeing_without_pixels
+  ckpt: ${CAMFORMER_CKPT}     # egoexo4d_dur8.pt da camformer_checkpoints.zip (DATA.md)
+  pose_encoding: rel9d_grav
+  d_model: 128
+  nhead: 4
+  num_layers: 4
+  dim_feedforward: 256
+  dropout: 0.1
+  output_dim: 512
+  context_s: 8.0              # traiettoria in ingresso (>= window.length_s); dur8 = contesto di 8 s
+  min_coverage: 0.9           # quota minima di campioni validi nella finestra
+  # Registro (17/11, audit punto 3): le take senza embedding CamFormer (nessuna finestra con copertura >= 0,9)
+  # restano nelle predizioni con cam_pred vuoto; nel gate vanno a EgoVLP e si contano come costo.
+  # feat-camformer si ferma solo se sono più di questa quota (data.max_missing_frac vale per gli altri stadi).
+  max_missing_frac: 0.10
+  batch_size: 128
+  device: auto
+
+egovlp:
+  ckpt: ${EGOVLP_CKPT}        # EgoVLP_PT_BEST (github.com/showlab/EgoVLP)
+  n_frames: 16                # istanti equispaziati nella finestra (come cascade)
+  frame_indices: [2, 6, 9, 13]  # i 4 frame dati al modello
+  pre_resize: 256
+  crop: 256
+  size: 224
+  norm_mean: [0.485, 0.456, 0.406]
+  norm_std: [0.229, 0.224, 0.225]
+  img_size: 224
+  patch_size: 16
+  embed_dim: 768
+  depth: 12
+  num_heads: 12
+  num_frames: 4
+  proj_dim: 256
+  batch_size: 16
+  num_workers: 4
+  device: auto
+
+heads:
+  Cs: [0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
+  inner_cv: 3                 # CV interna (raggruppata per sessione) per scegliere C e la temperatura
+  max_iter: 3000
+  class_weight: balanced      # null | balanced
+  # Registro (17/11, audit punto 2): una classe esce dall'accuratezza bilanciata solo se ha 0 take nello split.
+  min_takes_metric: 1         # classi con meno take nello split escono dall'accuratezza bilanciata
+  n_boot: 2000                # bootstrap per sessione dell'accuratezza bilanciata
+  ci_level: 0.95
+
+# Controllo pre-registrato (heads): se fallisce, heads esce con codice 3 e il gate non parte.
+check:
+  model: camformer            # L0
+  split: val                  # train (fuori campione; obbligatorio con official_val.mode: all_test) | val. Mai test.
+  # Soglie pre-registrate (registro, 17/11 pomeriggio): sulla val accuratezza bilanciata >= 0,40 E limite inferiore
+  # dell'intervallo bootstrap 95% (per sessione) sopra il caso; sul train fuori campione richiamo > 0 per ogni classe;
+  # tutte e 6 le classi presenti sia nella val sia nel train (audit punto 2).
+  min_bacc: 0.40
+  min_recall: null            # richiamo minimo di OGNI classe della testa sul train OOF (null = solo richiamo > 0)
+  ci_above_chance: true       # richiede anche il limite inferiore del bootstrap sopra il caso
+  require_all_classes: true   # fallisce se una classe della testa ha 0 take nello split del controllo o nel train

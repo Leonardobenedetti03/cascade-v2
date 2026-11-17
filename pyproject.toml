@@ -26,12 +26,12 @@ omit = ["src/cascade/models/vendor/*"]
 [tool.black]
 line-length = 120
 target-version = ["py39"]
-extend-exclude = "third_party|src/cascade/models/vendor"
+extend-exclude = "third_party|src/cascade/models/vendor|scenario_preds"
 
 [tool.ruff]
 line-length = 120
 target-version = "py39"
-extend-exclude = ["third_party", "src/cascade/models/vendor", "_synthetic_root"]
+extend-exclude = ["third_party", "src/cascade/models/vendor", "_synthetic_root", "scenario_preds"]
 
 [tool.ruff.lint]
 # pyflakes, pycodestyle, import ordinati, bugbear, pyupgrade (fermo a 3.9: niente "X | Y")

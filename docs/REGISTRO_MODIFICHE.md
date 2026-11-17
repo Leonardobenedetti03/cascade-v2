@@ -509,3 +509,11 @@ esclusi da `.gitignore`).
   per le singole classi solo i quintili con almeno 10 take.
 - Nota per il report: sul test thr_maxprob arriva ad acc 1,000 con meno costo di lgbm_ABC; il punto di lavoro resta
   quello scelto sulla val (N33), coerente con RQ2 non significativa (N34).
+
+**N36 — `scenario_preds` nel repo (17/11, notte).** Copiato in `scenario_preds/` il pacchetto di Giorgio con le
+modifiche del passo A (stadio `select`, `hpc/candidates.sh`, controlli su classi e embedding mancanti; 18 test), cioè
+esattamente la versione usata per `official_v2` e quindi per tutti i risultati di N33 e N34. Esclusi `.ruff_cache` e
+i file di lavoro. Il codice non è stato riformattato: è escluso da black e ruff in `pyproject.toml` (come
+`third_party`) e i suoi test si lanciano dalla sua cartella (`cd scenario_preds && python -m pytest -q`), non con
+quelli del repo. `hpc/env.sh` contiene solo percorsi e account di default del cluster; i valori personali vanno in
+`hpc/env.local.sh`, non versionato.
