@@ -1,0 +1,165 @@
+{
+  "aria_csv_missing": 1273,
+  "by_split": {
+    "test": {
+      "Basketball": {
+        "sessions": 7,
+        "takes": 46
+      },
+      "Bike repair": {
+        "sessions": 4,
+        "takes": 8
+      },
+      "Cooking": {
+        "sessions": 10,
+        "takes": 16
+      },
+      "Dance": {
+        "sessions": 7,
+        "takes": 56
+      },
+      "Health": {
+        "sessions": 9,
+        "takes": 10
+      },
+      "Soccer": {
+        "sessions": 3,
+        "takes": 6
+      }
+    },
+    "train": {
+      "Basketball": {
+        "sessions": 26,
+        "takes": 380
+      },
+      "Bike repair": {
+        "sessions": 27,
+        "takes": 63
+      },
+      "Bouldering": {
+        "sessions": 1,
+        "takes": 2
+      },
+      "Cooking": {
+        "sessions": 82,
+        "takes": 92
+      },
+      "Dance": {
+        "sessions": 30,
+        "takes": 337
+      },
+      "Health": {
+        "sessions": 46,
+        "takes": 57
+      },
+      "Soccer": {
+        "sessions": 25,
+        "takes": 57
+      }
+    },
+    "val": {
+      "Basketball": {
+        "sessions": 5,
+        "takes": 42
+      },
+      "Bike repair": {
+        "sessions": 3,
+        "takes": 10
+      },
+      "Cooking": {
+        "sessions": 13,
+        "takes": 15
+      },
+      "Dance": {
+        "sessions": 9,
+        "takes": 59
+      },
+      "Health": {
+        "sessions": 4,
+        "takes": 10
+      },
+      "Soccer": {
+        "sessions": 3,
+        "takes": 7
+      }
+    }
+  },
+  "camformer_pretrain_by_split": {
+    "none": {
+      "test": 14,
+      "train": 52,
+      "val": 0
+    },
+    "train": {
+      "test": 0,
+      "train": 936,
+      "val": 0
+    },
+    "val": {
+      "test": 128,
+      "train": 0,
+      "val": 143
+    }
+  },
+  "folds_first_seed": {
+    "0": 175,
+    "1": 201,
+    "2": 247,
+    "3": 134,
+    "4": 231
+  },
+  "n_takes": 1273,
+  "no_video": 0,
+  "official_val_composition": {
+    "Basketball": {
+      "sessions": 12,
+      "takes": 88
+    },
+    "Bike repair": {
+      "sessions": 7,
+      "takes": 18
+    },
+    "Cooking": {
+      "sessions": 23,
+      "takes": 31
+    },
+    "Dance": {
+      "sessions": 16,
+      "takes": 115
+    },
+    "Health": {
+      "sessions": 13,
+      "takes": 20
+    },
+    "Soccer": {
+      "sessions": 6,
+      "takes": 13
+    }
+  },
+  "sessions_train_and_eval": {
+    "n": 19,
+    "sessions": [
+      "sfu_covid_002",
+      "unc_basketball_02-24-23_01",
+      "unc_basketball_02-24-23_02",
+      "unc_basketball_03-09-23_02",
+      "unc_basketball_03-16-23_01",
+      "unc_basketball_03-30-23_01",
+      "unc_basketball_03-30-23_02",
+      "uniandes_basketball_001",
+      "uniandes_basketball_003",
+      "uniandes_basketball_004",
+      "uniandes_cooking_008",
+      "uniandes_dance_002",
+      "uniandes_dance_008",
+      "uniandes_dance_011",
+      "uniandes_dance_016",
+      "uniandes_dance_017",
+      "uniandes_dance_019",
+      "uniandes_dance_023",
+      "uniandes_dance_024"
+    ],
+    "takes_eval": 160
+  },
+  "short_takes_lt_window": 3
+}

@@ -1,0 +1,255 @@
+{
+  "note": "train = fuori campione (OOF), media su 3 seed; val/test = media dei modelli di fold di tutti i seed",
+  "test": {
+    "acc": 1.0,
+    "bacc": 1.0,
+    "bacc_ci": [
+      1.0,
+      1.0
+    ],
+    "bacc_classes": [
+      "Basketball",
+      "Dance",
+      "Soccer",
+      "Cooking",
+      "Health",
+      "Bike repair"
+    ],
+    "confusion": [
+      [
+        46,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        56,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        6,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        16,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        10,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        8
+      ]
+    ],
+    "n": 142,
+    "n_no_embedding": 0,
+    "recall": {
+      "Basketball": 1.0,
+      "Bike repair": 1.0,
+      "Cooking": 1.0,
+      "Dance": 1.0,
+      "Health": 1.0,
+      "Soccer": 1.0
+    },
+    "support": {
+      "Basketball": 46,
+      "Bike repair": 8,
+      "Cooking": 16,
+      "Dance": 56,
+      "Health": 10,
+      "Soccer": 6
+    }
+  },
+  "train": {
+    "acc": 1.0,
+    "bacc": 1.0,
+    "bacc_ci": [
+      1.0,
+      1.0
+    ],
+    "bacc_classes": [
+      "Basketball",
+      "Dance",
+      "Soccer",
+      "Cooking",
+      "Health",
+      "Bike repair"
+    ],
+    "confusion": [
+      [
+        380,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        337,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        57,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        92,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        57,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        63
+      ]
+    ],
+    "n": 986,
+    "n_no_embedding": 0,
+    "recall": {
+      "Basketball": 1.0,
+      "Bike repair": 1.0,
+      "Cooking": 1.0,
+      "Dance": 1.0,
+      "Health": 1.0,
+      "Soccer": 1.0
+    },
+    "support": {
+      "Basketball": 380,
+      "Bike repair": 63,
+      "Cooking": 92,
+      "Dance": 337,
+      "Health": 57,
+      "Soccer": 57
+    }
+  },
+  "val": {
+    "acc": 1.0,
+    "bacc": 1.0,
+    "bacc_ci": [
+      1.0,
+      1.0
+    ],
+    "bacc_classes": [
+      "Basketball",
+      "Dance",
+      "Soccer",
+      "Cooking",
+      "Health",
+      "Bike repair"
+    ],
+    "confusion": [
+      [
+        42,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        59,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        7,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        15,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        10,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        10
+      ]
+    ],
+    "n": 143,
+    "n_no_embedding": 0,
+    "recall": {
+      "Basketball": 1.0,
+      "Bike repair": 1.0,
+      "Cooking": 1.0,
+      "Dance": 1.0,
+      "Health": 1.0,
+      "Soccer": 1.0
+    },
+    "support": {
+      "Basketball": 42,
+      "Bike repair": 10,
+      "Cooking": 15,
+      "Dance": 59,
+      "Health": 10,
+      "Soccer": 7
+    }
+  }
+}

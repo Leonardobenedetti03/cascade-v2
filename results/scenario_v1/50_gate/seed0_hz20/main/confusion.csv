@@ -1,0 +1,289 @@
+split,system,true,pred,count
+val,L0,Basketball,Basketball,40
+val,L0,Basketball,Dance,2
+val,L0,Basketball,Soccer,0
+val,L0,Basketball,Cooking,0
+val,L0,Basketball,Health,0
+val,L0,Basketball,Bike repair,0
+val,L0,Dance,Basketball,0
+val,L0,Dance,Dance,59
+val,L0,Dance,Soccer,0
+val,L0,Dance,Cooking,0
+val,L0,Dance,Health,0
+val,L0,Dance,Bike repair,0
+val,L0,Soccer,Basketball,0
+val,L0,Soccer,Dance,1
+val,L0,Soccer,Soccer,6
+val,L0,Soccer,Cooking,0
+val,L0,Soccer,Health,0
+val,L0,Soccer,Bike repair,0
+val,L0,Cooking,Basketball,0
+val,L0,Cooking,Dance,0
+val,L0,Cooking,Soccer,0
+val,L0,Cooking,Cooking,11
+val,L0,Cooking,Health,3
+val,L0,Cooking,Bike repair,1
+val,L0,Health,Basketball,0
+val,L0,Health,Dance,0
+val,L0,Health,Soccer,0
+val,L0,Health,Cooking,0
+val,L0,Health,Health,10
+val,L0,Health,Bike repair,0
+val,L0,Bike repair,Basketball,0
+val,L0,Bike repair,Dance,0
+val,L0,Bike repair,Soccer,0
+val,L0,Bike repair,Cooking,3
+val,L0,Bike repair,Health,3
+val,L0,Bike repair,Bike repair,4
+val,L1,Basketball,Basketball,42
+val,L1,Basketball,Dance,0
+val,L1,Basketball,Soccer,0
+val,L1,Basketball,Cooking,0
+val,L1,Basketball,Health,0
+val,L1,Basketball,Bike repair,0
+val,L1,Dance,Basketball,0
+val,L1,Dance,Dance,59
+val,L1,Dance,Soccer,0
+val,L1,Dance,Cooking,0
+val,L1,Dance,Health,0
+val,L1,Dance,Bike repair,0
+val,L1,Soccer,Basketball,0
+val,L1,Soccer,Dance,0
+val,L1,Soccer,Soccer,7
+val,L1,Soccer,Cooking,0
+val,L1,Soccer,Health,0
+val,L1,Soccer,Bike repair,0
+val,L1,Cooking,Basketball,0
+val,L1,Cooking,Dance,0
+val,L1,Cooking,Soccer,0
+val,L1,Cooking,Cooking,15
+val,L1,Cooking,Health,0
+val,L1,Cooking,Bike repair,0
+val,L1,Health,Basketball,0
+val,L1,Health,Dance,0
+val,L1,Health,Soccer,0
+val,L1,Health,Cooking,0
+val,L1,Health,Health,10
+val,L1,Health,Bike repair,0
+val,L1,Bike repair,Basketball,0
+val,L1,Bike repair,Dance,0
+val,L1,Bike repair,Soccer,0
+val,L1,Bike repair,Cooking,0
+val,L1,Bike repair,Health,0
+val,L1,Bike repair,Bike repair,10
+val,fused,Basketball,Basketball,42
+val,fused,Basketball,Dance,0
+val,fused,Basketball,Soccer,0
+val,fused,Basketball,Cooking,0
+val,fused,Basketball,Health,0
+val,fused,Basketball,Bike repair,0
+val,fused,Dance,Basketball,0
+val,fused,Dance,Dance,59
+val,fused,Dance,Soccer,0
+val,fused,Dance,Cooking,0
+val,fused,Dance,Health,0
+val,fused,Dance,Bike repair,0
+val,fused,Soccer,Basketball,0
+val,fused,Soccer,Dance,0
+val,fused,Soccer,Soccer,7
+val,fused,Soccer,Cooking,0
+val,fused,Soccer,Health,0
+val,fused,Soccer,Bike repair,0
+val,fused,Cooking,Basketball,0
+val,fused,Cooking,Dance,0
+val,fused,Cooking,Soccer,0
+val,fused,Cooking,Cooking,15
+val,fused,Cooking,Health,0
+val,fused,Cooking,Bike repair,0
+val,fused,Health,Basketball,0
+val,fused,Health,Dance,0
+val,fused,Health,Soccer,0
+val,fused,Health,Cooking,0
+val,fused,Health,Health,10
+val,fused,Health,Bike repair,0
+val,fused,Bike repair,Basketball,0
+val,fused,Bike repair,Dance,0
+val,fused,Bike repair,Soccer,0
+val,fused,Bike repair,Cooking,0
+val,fused,Bike repair,Health,0
+val,fused,Bike repair,Bike repair,10
+val,cascade[lgbm_ABC],Basketball,Basketball,42
+val,cascade[lgbm_ABC],Basketball,Dance,0
+val,cascade[lgbm_ABC],Basketball,Soccer,0
+val,cascade[lgbm_ABC],Basketball,Cooking,0
+val,cascade[lgbm_ABC],Basketball,Health,0
+val,cascade[lgbm_ABC],Basketball,Bike repair,0
+val,cascade[lgbm_ABC],Dance,Basketball,0
+val,cascade[lgbm_ABC],Dance,Dance,59
+val,cascade[lgbm_ABC],Dance,Soccer,0
+val,cascade[lgbm_ABC],Dance,Cooking,0
+val,cascade[lgbm_ABC],Dance,Health,0
+val,cascade[lgbm_ABC],Dance,Bike repair,0
+val,cascade[lgbm_ABC],Soccer,Basketball,0
+val,cascade[lgbm_ABC],Soccer,Dance,0
+val,cascade[lgbm_ABC],Soccer,Soccer,7
+val,cascade[lgbm_ABC],Soccer,Cooking,0
+val,cascade[lgbm_ABC],Soccer,Health,0
+val,cascade[lgbm_ABC],Soccer,Bike repair,0
+val,cascade[lgbm_ABC],Cooking,Basketball,0
+val,cascade[lgbm_ABC],Cooking,Dance,0
+val,cascade[lgbm_ABC],Cooking,Soccer,0
+val,cascade[lgbm_ABC],Cooking,Cooking,15
+val,cascade[lgbm_ABC],Cooking,Health,0
+val,cascade[lgbm_ABC],Cooking,Bike repair,0
+val,cascade[lgbm_ABC],Health,Basketball,0
+val,cascade[lgbm_ABC],Health,Dance,0
+val,cascade[lgbm_ABC],Health,Soccer,0
+val,cascade[lgbm_ABC],Health,Cooking,0
+val,cascade[lgbm_ABC],Health,Health,10
+val,cascade[lgbm_ABC],Health,Bike repair,0
+val,cascade[lgbm_ABC],Bike repair,Basketball,0
+val,cascade[lgbm_ABC],Bike repair,Dance,0
+val,cascade[lgbm_ABC],Bike repair,Soccer,0
+val,cascade[lgbm_ABC],Bike repair,Cooking,1
+val,cascade[lgbm_ABC],Bike repair,Health,0
+val,cascade[lgbm_ABC],Bike repair,Bike repair,9
+test,L0,Basketball,Basketball,45
+test,L0,Basketball,Dance,0
+test,L0,Basketball,Soccer,1
+test,L0,Basketball,Cooking,0
+test,L0,Basketball,Health,0
+test,L0,Basketball,Bike repair,0
+test,L0,Dance,Basketball,0
+test,L0,Dance,Dance,56
+test,L0,Dance,Soccer,0
+test,L0,Dance,Cooking,0
+test,L0,Dance,Health,0
+test,L0,Dance,Bike repair,0
+test,L0,Soccer,Basketball,0
+test,L0,Soccer,Dance,2
+test,L0,Soccer,Soccer,4
+test,L0,Soccer,Cooking,0
+test,L0,Soccer,Health,0
+test,L0,Soccer,Bike repair,0
+test,L0,Cooking,Basketball,0
+test,L0,Cooking,Dance,0
+test,L0,Cooking,Soccer,0
+test,L0,Cooking,Cooking,14
+test,L0,Cooking,Health,1
+test,L0,Cooking,Bike repair,1
+test,L0,Health,Basketball,0
+test,L0,Health,Dance,0
+test,L0,Health,Soccer,0
+test,L0,Health,Cooking,1
+test,L0,Health,Health,6
+test,L0,Health,Bike repair,3
+test,L0,Bike repair,Basketball,0
+test,L0,Bike repair,Dance,0
+test,L0,Bike repair,Soccer,0
+test,L0,Bike repair,Cooking,2
+test,L0,Bike repair,Health,1
+test,L0,Bike repair,Bike repair,5
+test,L1,Basketball,Basketball,46
+test,L1,Basketball,Dance,0
+test,L1,Basketball,Soccer,0
+test,L1,Basketball,Cooking,0
+test,L1,Basketball,Health,0
+test,L1,Basketball,Bike repair,0
+test,L1,Dance,Basketball,0
+test,L1,Dance,Dance,56
+test,L1,Dance,Soccer,0
+test,L1,Dance,Cooking,0
+test,L1,Dance,Health,0
+test,L1,Dance,Bike repair,0
+test,L1,Soccer,Basketball,0
+test,L1,Soccer,Dance,0
+test,L1,Soccer,Soccer,6
+test,L1,Soccer,Cooking,0
+test,L1,Soccer,Health,0
+test,L1,Soccer,Bike repair,0
+test,L1,Cooking,Basketball,0
+test,L1,Cooking,Dance,0
+test,L1,Cooking,Soccer,0
+test,L1,Cooking,Cooking,16
+test,L1,Cooking,Health,0
+test,L1,Cooking,Bike repair,0
+test,L1,Health,Basketball,0
+test,L1,Health,Dance,0
+test,L1,Health,Soccer,0
+test,L1,Health,Cooking,0
+test,L1,Health,Health,10
+test,L1,Health,Bike repair,0
+test,L1,Bike repair,Basketball,0
+test,L1,Bike repair,Dance,0
+test,L1,Bike repair,Soccer,0
+test,L1,Bike repair,Cooking,0
+test,L1,Bike repair,Health,0
+test,L1,Bike repair,Bike repair,8
+test,fused,Basketball,Basketball,46
+test,fused,Basketball,Dance,0
+test,fused,Basketball,Soccer,0
+test,fused,Basketball,Cooking,0
+test,fused,Basketball,Health,0
+test,fused,Basketball,Bike repair,0
+test,fused,Dance,Basketball,0
+test,fused,Dance,Dance,56
+test,fused,Dance,Soccer,0
+test,fused,Dance,Cooking,0
+test,fused,Dance,Health,0
+test,fused,Dance,Bike repair,0
+test,fused,Soccer,Basketball,0
+test,fused,Soccer,Dance,0
+test,fused,Soccer,Soccer,6
+test,fused,Soccer,Cooking,0
+test,fused,Soccer,Health,0
+test,fused,Soccer,Bike repair,0
+test,fused,Cooking,Basketball,0
+test,fused,Cooking,Dance,0
+test,fused,Cooking,Soccer,0
+test,fused,Cooking,Cooking,16
+test,fused,Cooking,Health,0
+test,fused,Cooking,Bike repair,0
+test,fused,Health,Basketball,0
+test,fused,Health,Dance,0
+test,fused,Health,Soccer,0
+test,fused,Health,Cooking,0
+test,fused,Health,Health,10
+test,fused,Health,Bike repair,0
+test,fused,Bike repair,Basketball,0
+test,fused,Bike repair,Dance,0
+test,fused,Bike repair,Soccer,0
+test,fused,Bike repair,Cooking,0
+test,fused,Bike repair,Health,0
+test,fused,Bike repair,Bike repair,8
+test,cascade[lgbm_ABC],Basketball,Basketball,46
+test,cascade[lgbm_ABC],Basketball,Dance,0
+test,cascade[lgbm_ABC],Basketball,Soccer,0
+test,cascade[lgbm_ABC],Basketball,Cooking,0
+test,cascade[lgbm_ABC],Basketball,Health,0
+test,cascade[lgbm_ABC],Basketball,Bike repair,0
+test,cascade[lgbm_ABC],Dance,Basketball,0
+test,cascade[lgbm_ABC],Dance,Dance,56
+test,cascade[lgbm_ABC],Dance,Soccer,0
+test,cascade[lgbm_ABC],Dance,Cooking,0
+test,cascade[lgbm_ABC],Dance,Health,0
+test,cascade[lgbm_ABC],Dance,Bike repair,0
+test,cascade[lgbm_ABC],Soccer,Basketball,0
+test,cascade[lgbm_ABC],Soccer,Dance,0
+test,cascade[lgbm_ABC],Soccer,Soccer,6
+test,cascade[lgbm_ABC],Soccer,Cooking,0
+test,cascade[lgbm_ABC],Soccer,Health,0
+test,cascade[lgbm_ABC],Soccer,Bike repair,0
+test,cascade[lgbm_ABC],Cooking,Basketball,0
+test,cascade[lgbm_ABC],Cooking,Dance,0
+test,cascade[lgbm_ABC],Cooking,Soccer,0
+test,cascade[lgbm_ABC],Cooking,Cooking,16
+test,cascade[lgbm_ABC],Cooking,Health,0
+test,cascade[lgbm_ABC],Cooking,Bike repair,0
+test,cascade[lgbm_ABC],Health,Basketball,0
+test,cascade[lgbm_ABC],Health,Dance,0
+test,cascade[lgbm_ABC],Health,Soccer,0
+test,cascade[lgbm_ABC],Health,Cooking,0
+test,cascade[lgbm_ABC],Health,Health,10
+test,cascade[lgbm_ABC],Health,Bike repair,0
+test,cascade[lgbm_ABC],Bike repair,Basketball,0
+test,cascade[lgbm_ABC],Bike repair,Dance,0
+test,cascade[lgbm_ABC],Bike repair,Soccer,0
+test,cascade[lgbm_ABC],Bike repair,Cooking,0
+test,cascade[lgbm_ABC],Bike repair,Health,0
+test,cascade[lgbm_ABC],Bike repair,Bike repair,8

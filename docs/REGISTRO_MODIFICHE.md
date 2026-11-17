@@ -479,3 +479,21 @@ non si cambia più nulla del metodo e il test si valuta una volta sola.
 - Limite: il punto di lavoro è scelto e misurato sulla stessa val ed è al bordo (1 errore): sul test può cambiare
   di una take in più o in meno.
 
+**N34 — Test, valutazione unica (17/11, 22:50).** Dopo N33 (commit 362f5e2): previsioni sigillate di `scenario_preds`
+(`heads --eval-test`, job 770706) e stadi 44 `--include-test`, 50 `--final`, 53 `--final` (job 770707); una riga in
+`50_gate/FINAL_RUNS.log`, `FINAL_DONE` presente. Output copiati in `results/scenario_v1/` (senza i `.parquet`,
+esclusi da `.gitignore`).
+- Test, 142 take: CamFormer acc 0,915, bacc 0,791 (CI 0,627–0,907); EgoVLP acc e bacc 1,000; 0 take senza L0.
+- Gate con la soglia scelta sulla val: acc 1,000 e bacc 1,000 per tutti i gate appresi e a soglia; costo rispetto ad
+  always_L1: lgbm_ABC 0,245, logreg_ABC 0,262, logreg_AC 0,269, thr_maxprob/thr_margin/thr_entropy/logreg_A/
+  compare_A/compare_AC 0,283; oracolo 0,093; random acc 0,992 con costo 0,871. Regola `rule_procedural`: acc 0,979,
+  bacc 0,941, costo 0,240. Differenza di accuratezza da always_L1 (bootstrap per sessione, 40 sessioni): 0 per i gate.
+- Senza le sessioni in comune col train (9 sessioni, 75 take; restano 67 take): CamFormer acc 0,821; gate acc 1,000 con
+  costo 0,50–0,58 (lgbm_ABC 0,503); regola procedurale acc 0,955.
+- Quota mandata a EgoVLP per classe (test): thr_maxprob Basketball 0,11, Dance 0,07, Soccer 0,67, Cooking 0,75,
+  Health 0,80, Bike repair 0,88; lgbm_ABC 0,11, 0,02, 0,67, 0,69, 0,77, 0,75.
+- RQ2 (confronti appaiati, 1000 ricampionamenti): `compare_AC` e `compare_A` identici; `logreg_AC` − `logreg_A`
+  sull'area della curva −0,0006 (CI −0,0020 / 0,0006, p 0,38). Le feature di traiettoria e moto non migliorano in
+  modo significativo il gate rispetto alla sola confidenza di CamFormer; i gate con il gruppo C scalano 3–5 take in
+  meno sia su val sia su test (tendenza, non prova).
+

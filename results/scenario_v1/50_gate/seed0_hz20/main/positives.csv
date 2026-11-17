@@ -1,0 +1,37 @@
+split,fold,class,n,n_pos,y_rate
+train,0,Basketball,86,5,0.05813953488372093
+train,0,Dance,27,0,0.0
+train,0,Soccer,15,2,0.13333333333333333
+train,0,Cooking,17,4,0.23529411764705882
+train,0,Health,11,2,0.18181818181818182
+train,0,Bike repair,18,5,0.2777777777777778
+train,1,Basketball,91,2,0.02197802197802198
+train,1,Dance,52,0,0.0
+train,1,Soccer,10,1,0.1
+train,1,Cooking,16,5,0.3125
+train,1,Health,10,3,0.3
+train,1,Bike repair,21,9,0.42857142857142855
+train,2,Basketball,102,1,0.00980392156862745
+train,2,Dance,92,0,0.0
+train,2,Soccer,12,0,0.0
+train,2,Cooking,23,5,0.21739130434782608
+train,2,Health,9,0,0.0
+train,2,Bike repair,9,3,0.3333333333333333
+train,3,Basketball,45,2,0.044444444444444446
+train,3,Dance,43,5,0.11627906976744186
+train,3,Soccer,6,0,0.0
+train,3,Cooking,21,7,0.3333333333333333
+train,3,Health,15,2,0.13333333333333333
+train,3,Bike repair,4,1,0.25
+train,4,Basketball,56,3,0.05357142857142857
+train,4,Dance,123,1,0.008130081300813009
+train,4,Soccer,14,0,0.0
+train,4,Cooking,15,4,0.26666666666666666
+train,4,Health,12,2,0.16666666666666666
+train,4,Bike repair,11,1,0.09090909090909091
+val,-1,Basketball,42,2,0.047619047619047616
+val,-1,Dance,59,0,0.0
+val,-1,Soccer,7,1,0.14285714285714285
+val,-1,Cooking,15,4,0.26666666666666666
+val,-1,Health,10,0,0.0
+val,-1,Bike repair,10,6,0.6

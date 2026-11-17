@@ -1,0 +1,5 @@
+split,model,auroc,auroc_ci_low,auroc_ci_high,eta1_std,c1_rate,n,n_pos
+val,compare_A,,,,0.0,1.0,143,143
+val,compare_AC,,,,0.0,1.0,143,143
+train,compare_A,,,,0.0,1.0,986,986
+train,compare_AC,,,,0.0,1.0,986,986

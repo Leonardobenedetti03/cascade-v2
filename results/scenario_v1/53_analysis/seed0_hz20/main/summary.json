@@ -1,0 +1,19 @@
+{
+  "splits": [
+    "val",
+    "test"
+  ],
+  "motion_feature": "mot_energy",
+  "n_no_l0": {
+    "val": 0,
+    "test": 0
+  },
+  "n_shared_sessions": {
+    "val": 10,
+    "test": 9
+  },
+  "n_takes_shared": {
+    "val": 85,
+    "test": 75
+  }
+}

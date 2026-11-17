@@ -1,0 +1,1 @@
+2026-11-17T21:49:15Z	commit=362f5e2	cache=/home/3195149/cascade_v2_root/runs/scenario_v1/45_cache/seed0_hz20/cache.parquet	cache_sha=6a14af134168c271	variant=seed0_hz20	tag=main	models=always_L0,always_L1,random,oracle,thr_maxprob,thr_margin,thr_entropy,logreg_A,logreg_AC,logreg_ABC,lgbm_ABC,compare_A,compare_AC

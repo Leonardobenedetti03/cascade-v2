@@ -1,0 +1,7 @@
+run_dir,variant,n_windows,val_bacc,val_bacc_ci,val_n,val_n_no_embedding
+/home/3195149/scenario_runs/official_v2_cand/id_w5,identita,5,0.8238095238095239,"[0.7591527935277935, 0.9140877760524501]",143,0
+/home/3195149/scenario_runs/official_v2_cand/id_w3,identita,3,0.7904761904761904,"[0.7011180926916221, 0.8879542572463766]",143,0
+/home/3195149/scenario_runs/official_v2_cand/flip_w5,"diag(-1,-1,1)",5,0.7890503093892924,"[0.6428983981804105, 0.9219942201359211]",143,0
+/home/3195149/scenario_runs/official_v2_cand/id_w1,identita,1,0.6793650793650795,"[0.5726943277310924, 0.7963059413580247]",143,0
+/home/3195149/scenario_runs/official_v2_cand/flip_w3,"diag(-1,-1,1)",3,0.6593354856066721,"[0.5352599923970892, 0.7866446096049188]",143,0
+/home/3195149/scenario_runs/official_v2_cand/flip_w1,"diag(-1,-1,1)",1,0.5662900188323917,"[0.4403606564332364, 0.728358614146443]",143,0

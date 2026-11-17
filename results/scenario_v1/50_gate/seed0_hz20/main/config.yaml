@@ -1,0 +1,267 @@
+run_name: scenario_v1
+seed: 0
+paths:
+  scenario_csv: '{repo}/splits/site_v1/scenario_site.csv'
+  split_sha256: c9f4e3083f57b099ef9693a5fa57b2f8666bddb6f4377834a7d015e2c7e0344d
+  takes_json: '{data}/egoexo4d/takes.json'
+  takes_root: '{data}/egoexo4d/takes'
+  video_pattern: '{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/aria01_214-1.mp4'
+  video_glob: '{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/*214-1*.mp4'
+  traj_pattern: '{takes_root}/{take_name}/trajectory/closed_loop_trajectory.csv'
+  camformer_npz_dir: '{data}/camformer/egoexo4d_pretrain'
+  camformer_ckpt: '{data}/checkpoints/camformer/egoexo4d_dur8.pt'
+  egovlp_ckpt: '{data}/checkpoints/egovlp/egovlp.pth'
+  frame_baseline_ckpt: '{data}/checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth'
+  frames_dir: '{data}/frames/{run_name}'
+  traj_cache_dir: '{run}/traj_cache'
+  traj_dir: '{run}/01_traj'
+  pose_roots: []
+data:
+  window_s: 8.0
+  n_windows: 1
+  window_stride_s: null
+  window_placement: center
+  duration_source: takes_json
+  traj_source: aria_csv
+  traj_fps: 20.0
+  pose_src_fps: 30.0
+  pose_max_gap_frames: 15
+  min_traj_coverage: 0.9
+  vertical_axis: 2
+  out_of_range: drop
+  short_take: keep
+  max_missing_frac: 0.02
+  expected_split_counts:
+    train: 1138
+    val: 68
+    test: 67
+alignment:
+  mode: same_origin
+  offset_s: 0.0
+  scale: 1.0
+  video_start_key: video_start_us
+  traj_start_key: traj_start_us
+frames:
+  n_frames: 16
+  pre_resize: 256
+  crop: 256
+  size: 224
+  pre_resize_mode: bicubic
+  pre_resize_antialias: true
+  final_antialias: false
+  rotate_k90: 0
+  decoder: auto
+folds:
+  n_folds: 5
+  inner_holdout_frac: 0.1
+  seed: 0
+  group_by: site
+  site_map: '{repo}/splits/site_v1/split.json'
+camformer:
+  arch:
+    d_model: 128
+    nhead: 4
+    num_layers: 4
+    dim_feedforward: 256
+    dropout: 0.1
+    output_dim: 512
+    pose_encoding: rel9d_grav
+  train:
+    optimizer: adamw
+    lr: 0.0001
+    weight_decay: 0.001
+    head_lr_mult: 10.0
+    epochs: 50
+    batch_size: 64
+    patience: 8
+    monitor: val_loss
+    temporal_jitter_s: 0.0
+    num_workers: 4
+    pin_memory: true
+    prefetch_factor: 2
+    persistent_workers: false
+    grad_clip: 1.0
+  context_s: null
+  pretrained: true
+  freeze_encoder: true
+  init_head_from_ckpt: false
+  eval_source: fold_ensemble
+  seed: null
+  mc_dropout_passes: 0
+  batch_size_eval: 256
+  device: auto
+egovlp:
+  arch:
+    img_size: 224
+    patch_size: 16
+    embed_dim: 768
+    depth: 12
+    num_heads: 12
+    num_frames: 4
+    proj_dim: 256
+  zero_shot:
+    enabled: false
+    text_model: distilbert-base-uncased
+    temperature: 0.05
+    prompts:
+      Basketball: '#C C plays basketball on a court'
+      Dance: '#C C dances'
+      Music: '#C C plays a musical instrument'
+      Soccer: '#C C plays soccer on a field'
+      Cooking: '#C C cooks food in a kitchen'
+      Bouldering: '#C C climbs a bouldering wall'
+      Health: '#C C performs a medical test'
+      Bike repair: '#C C repairs a bicycle'
+  frame_indices:
+  - 2
+  - 6
+  - 9
+  - 13
+  norm_mean:
+  - 0.485
+  - 0.456
+  - 0.406
+  norm_std:
+  - 0.229
+  - 0.224
+  - 0.225
+  pretrained: true
+  batch_size: 16
+  num_workers: 4
+  pin_memory: true
+  device: auto
+frame_baseline:
+  enabled: false
+  arch: mobilenet_v3_small
+  frame_index: 8
+  size: 112
+  pretrained: true
+  batch_size: 64
+  device: auto
+  w_grid_step: 0.1
+  r_step: 5
+heads:
+  source: probe
+  Cs:
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1.0
+  - 10.0
+  inner_cv: 3
+  max_iter: 2000
+fusion:
+  mode: replace
+  w_grid_step: 0.05
+cost:
+  timesformer_frames:
+  - 4
+  - 8
+  - 16
+  latency_reps: 20
+  gate_gmacs: 0.0
+  counter: fvcore
+  override_gmacs: null
+  device: auto
+  expected:
+    camformer: 0.12
+    timesformer_4f: 90.0
+cost_e2e:
+  n_clips: 200
+  n_warmup: 5
+  passes: 2
+  seed: 0
+site_diag:
+  C: 0.1
+  max_iter: 500
+  cv_folds: 5
+gate:
+  reliability_alpha: 1.0
+  emb_pca_dim: 16
+  models:
+  - always_L0
+  - always_L1
+  - random
+  - oracle
+  - thr_maxprob
+  - thr_margin
+  - thr_entropy
+  - logreg_A
+  - logreg_AC
+  - logreg_ABC
+  - lgbm_ABC
+  - compare_A
+  - compare_AC
+  logreg_Cs:
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1.0
+  - 10.0
+  logreg_inner_cv: 3
+  logreg_class_weight: balanced
+  lgbm:
+    num_leaves: 15
+    min_child_samples: 20
+    learning_rate: 0.05
+    n_estimators: 500
+    subsample: 0.8
+    subsample_freq: 1
+    colsample_bytree: 0.8
+    early_stopping_rounds: 30
+    valid_frac: 0.2
+    deterministic: true
+    force_row_wise: true
+  random_seeds: 10
+  seeds:
+  - 0
+  - 1
+  - 2
+  r_step: 1
+  budgets:
+  - 0.25
+  - 0.5
+  within_pts: 0.01
+  improvement_deltas:
+  - 0.0
+  - 0.01
+  bacc_min_takes: 1
+  transfer_budgets:
+  - 0.25
+  - 0.5
+  operating_budget: 0.5
+  operating_rule: within_pts
+  bootstrap: 1000
+  bootstrap_seed: 0
+  comparisons:
+  - - compare_A
+    - thr_maxprob
+  - - compare_AC
+    - compare_A
+  - - logreg_AC
+    - logreg_A
+  reference: []
+  compare:
+    Cs:
+    - 0.001
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    inner_cv: 3
+synthetic:
+  takes_per_class:
+    train: 12
+    val: 4
+    test: 4
+  duration_s:
+  - 12.0
+  - 20.0
+  traj_hz: 100.0
+  video_fps: 10.0
+  video_size: 64
+  traj_offset_s: 0.4
+  missing_video: 1
+  missing_traj: 1
+  video_confusion: 0.08
+  seed: 0

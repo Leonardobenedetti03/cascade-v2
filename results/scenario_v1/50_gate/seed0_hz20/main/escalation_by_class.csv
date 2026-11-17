@@ -1,0 +1,157 @@
+split,model,class,procedural,escalation_rate
+val,always_L0,Basketball,False,0.0
+val,always_L0,Dance,False,0.0
+val,always_L0,Soccer,False,0.0
+val,always_L0,Cooking,True,0.0
+val,always_L0,Health,True,0.0
+val,always_L0,Bike repair,True,0.0
+val,always_L1,Basketball,False,1.0
+val,always_L1,Dance,False,1.0
+val,always_L1,Soccer,False,1.0
+val,always_L1,Cooking,True,1.0
+val,always_L1,Health,True,1.0
+val,always_L1,Bike repair,True,1.0
+val,random,Basketball,False,0.880952380952381
+val,random,Dance,False,0.8542372881355933
+val,random,Soccer,False,0.9142857142857143
+val,random,Cooking,True,0.8866666666666667
+val,random,Health,True,0.85
+val,random,Bike repair,True,0.89
+val,oracle,Basketball,False,0.047619047619047616
+val,oracle,Dance,False,0.0
+val,oracle,Soccer,False,0.14285714285714285
+val,oracle,Cooking,True,0.26666666666666666
+val,oracle,Health,True,0.0
+val,oracle,Bike repair,True,0.6
+val,thr_maxprob,Basketball,False,0.16666666666666666
+val,thr_maxprob,Dance,False,0.1016949152542373
+val,thr_maxprob,Soccer,False,0.2857142857142857
+val,thr_maxprob,Cooking,True,0.8666666666666667
+val,thr_maxprob,Health,True,0.5
+val,thr_maxprob,Bike repair,True,0.8
+val,thr_margin,Basketball,False,0.16666666666666666
+val,thr_margin,Dance,False,0.1016949152542373
+val,thr_margin,Soccer,False,0.2857142857142857
+val,thr_margin,Cooking,True,0.8666666666666667
+val,thr_margin,Health,True,0.7
+val,thr_margin,Bike repair,True,0.8
+val,thr_entropy,Basketball,False,0.16666666666666666
+val,thr_entropy,Dance,False,0.1016949152542373
+val,thr_entropy,Soccer,False,0.2857142857142857
+val,thr_entropy,Cooking,True,0.8666666666666667
+val,thr_entropy,Health,True,0.5
+val,thr_entropy,Bike repair,True,0.8
+val,logreg_A,Basketball,False,0.16666666666666666
+val,logreg_A,Dance,False,0.1016949152542373
+val,logreg_A,Soccer,False,0.2857142857142857
+val,logreg_A,Cooking,True,0.8666666666666667
+val,logreg_A,Health,True,0.5
+val,logreg_A,Bike repair,True,0.8
+val,logreg_AC,Basketball,False,0.11904761904761904
+val,logreg_AC,Dance,False,0.1016949152542373
+val,logreg_AC,Soccer,False,0.2857142857142857
+val,logreg_AC,Cooking,True,0.8666666666666667
+val,logreg_AC,Health,True,0.6
+val,logreg_AC,Bike repair,True,0.8
+val,logreg_ABC,Basketball,False,0.11904761904761904
+val,logreg_ABC,Dance,False,0.06779661016949153
+val,logreg_ABC,Soccer,False,0.2857142857142857
+val,logreg_ABC,Cooking,True,0.8666666666666667
+val,logreg_ABC,Health,True,0.7
+val,logreg_ABC,Bike repair,True,0.8
+val,lgbm_ABC,Basketball,False,0.1111111111111111
+val,lgbm_ABC,Dance,False,0.05084745762711865
+val,lgbm_ABC,Soccer,False,0.5238095238095237
+val,lgbm_ABC,Cooking,True,0.8666666666666667
+val,lgbm_ABC,Health,True,0.43333333333333335
+val,lgbm_ABC,Bike repair,True,0.7666666666666666
+val,compare_A,Basketball,False,0.16666666666666666
+val,compare_A,Dance,False,0.1016949152542373
+val,compare_A,Soccer,False,0.2857142857142857
+val,compare_A,Cooking,True,0.8666666666666667
+val,compare_A,Health,True,0.5
+val,compare_A,Bike repair,True,0.8
+val,compare_AC,Basketball,False,0.16666666666666666
+val,compare_AC,Dance,False,0.1016949152542373
+val,compare_AC,Soccer,False,0.2857142857142857
+val,compare_AC,Cooking,True,0.8666666666666667
+val,compare_AC,Health,True,0.5
+val,compare_AC,Bike repair,True,0.8
+test,always_L0,Basketball,False,0.0
+test,always_L0,Dance,False,0.0
+test,always_L0,Soccer,False,0.0
+test,always_L0,Cooking,True,0.0
+test,always_L0,Health,True,0.0
+test,always_L0,Bike repair,True,0.0
+test,always_L1,Basketball,False,1.0
+test,always_L1,Dance,False,1.0
+test,always_L1,Soccer,False,1.0
+test,always_L1,Cooking,True,1.0
+test,always_L1,Health,True,1.0
+test,always_L1,Bike repair,True,1.0
+test,random,Basketball,False,0.8413043478260869
+test,random,Dance,False,0.8839285714285714
+test,random,Soccer,False,0.8666666666666666
+test,random,Cooking,True,0.8875
+test,random,Health,True,0.9000000000000001
+test,random,Bike repair,True,0.875
+test,oracle,Basketball,False,0.021739130434782608
+test,oracle,Dance,False,0.0
+test,oracle,Soccer,False,0.5
+test,oracle,Cooking,True,0.125
+test,oracle,Health,True,0.4
+test,oracle,Bike repair,True,0.375
+test,thr_maxprob,Basketball,False,0.10869565217391304
+test,thr_maxprob,Dance,False,0.07142857142857142
+test,thr_maxprob,Soccer,False,0.6666666666666666
+test,thr_maxprob,Cooking,True,0.75
+test,thr_maxprob,Health,True,0.8
+test,thr_maxprob,Bike repair,True,0.875
+test,thr_margin,Basketball,False,0.10869565217391304
+test,thr_margin,Dance,False,0.07142857142857142
+test,thr_margin,Soccer,False,0.6666666666666666
+test,thr_margin,Cooking,True,0.75
+test,thr_margin,Health,True,0.8
+test,thr_margin,Bike repair,True,0.875
+test,thr_entropy,Basketball,False,0.10869565217391304
+test,thr_entropy,Dance,False,0.07142857142857142
+test,thr_entropy,Soccer,False,0.6666666666666666
+test,thr_entropy,Cooking,True,0.75
+test,thr_entropy,Health,True,0.8
+test,thr_entropy,Bike repair,True,0.875
+test,logreg_A,Basketball,False,0.10869565217391304
+test,logreg_A,Dance,False,0.07142857142857142
+test,logreg_A,Soccer,False,0.6666666666666666
+test,logreg_A,Cooking,True,0.75
+test,logreg_A,Health,True,0.8
+test,logreg_A,Bike repair,True,0.875
+test,logreg_AC,Basketball,False,0.10869565217391304
+test,logreg_AC,Dance,False,0.07142857142857142
+test,logreg_AC,Soccer,False,0.5
+test,logreg_AC,Cooking,True,0.6875
+test,logreg_AC,Health,True,0.8
+test,logreg_AC,Bike repair,True,0.875
+test,logreg_ABC,Basketball,False,0.08695652173913043
+test,logreg_ABC,Dance,False,0.05357142857142857
+test,logreg_ABC,Soccer,False,0.6666666666666666
+test,logreg_ABC,Cooking,True,0.6875
+test,logreg_ABC,Health,True,0.8
+test,logreg_ABC,Bike repair,True,0.875
+test,lgbm_ABC,Basketball,False,0.10869565217391304
+test,lgbm_ABC,Dance,False,0.017857142857142856
+test,lgbm_ABC,Soccer,False,0.6666666666666666
+test,lgbm_ABC,Cooking,True,0.6875
+test,lgbm_ABC,Health,True,0.7666666666666666
+test,lgbm_ABC,Bike repair,True,0.75
+test,compare_A,Basketball,False,0.10869565217391304
+test,compare_A,Dance,False,0.07142857142857142
+test,compare_A,Soccer,False,0.6666666666666666
+test,compare_A,Cooking,True,0.75
+test,compare_A,Health,True,0.8
+test,compare_A,Bike repair,True,0.875
+test,compare_AC,Basketball,False,0.10869565217391304
+test,compare_AC,Dance,False,0.07142857142857142
+test,compare_AC,Soccer,False,0.6666666666666666
+test,compare_AC,Cooking,True,0.75
+test,compare_AC,Health,True,0.8
+test,compare_AC,Bike repair,True,0.875

@@ -1,0 +1,212 @@
+{
+  "candidates": [
+    {
+      "json_cam_to_device": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "n_windows": 5,
+      "run_dir": "/home/3195149/scenario_runs/official_v2_cand/id_w5",
+      "val_bacc": 0.8238095238095239,
+      "val_bacc_ci": [
+        0.7591527935277935,
+        0.9140877760524501
+      ],
+      "val_n": 143,
+      "val_n_no_embedding": 0,
+      "variant": "identita"
+    },
+    {
+      "json_cam_to_device": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "n_windows": 3,
+      "run_dir": "/home/3195149/scenario_runs/official_v2_cand/id_w3",
+      "val_bacc": 0.7904761904761904,
+      "val_bacc_ci": [
+        0.7011180926916221,
+        0.8879542572463766
+      ],
+      "val_n": 143,
+      "val_n_no_embedding": 0,
+      "variant": "identita"
+    },
+    {
+      "json_cam_to_device": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "n_windows": 5,
+      "run_dir": "/home/3195149/scenario_runs/official_v2_cand/flip_w5",
+      "val_bacc": 0.7890503093892924,
+      "val_bacc_ci": [
+        0.6428983981804105,
+        0.9219942201359211
+      ],
+      "val_n": 143,
+      "val_n_no_embedding": 0,
+      "variant": "diag(-1,-1,1)"
+    },
+    {
+      "json_cam_to_device": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "n_windows": 1,
+      "run_dir": "/home/3195149/scenario_runs/official_v2_cand/id_w1",
+      "val_bacc": 0.6793650793650795,
+      "val_bacc_ci": [
+        0.5726943277310924,
+        0.7963059413580247
+      ],
+      "val_n": 143,
+      "val_n_no_embedding": 0,
+      "variant": "identita"
+    },
+    {
+      "json_cam_to_device": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "n_windows": 3,
+      "run_dir": "/home/3195149/scenario_runs/official_v2_cand/flip_w3",
+      "val_bacc": 0.6593354856066721,
+      "val_bacc_ci": [
+        0.5352599923970892,
+        0.7866446096049188
+      ],
+      "val_n": 143,
+      "val_n_no_embedding": 0,
+      "variant": "diag(-1,-1,1)"
+    },
+    {
+      "json_cam_to_device": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "n_windows": 1,
+      "run_dir": "/home/3195149/scenario_runs/official_v2_cand/flip_w1",
+      "val_bacc": 0.5662900188323917,
+      "val_bacc_ci": [
+        0.4403606564332364,
+        0.728358614146443
+      ],
+      "val_n": 143,
+      "val_n_no_embedding": 0,
+      "variant": "diag(-1,-1,1)"
+    }
+  ],
+  "chosen": {
+    "json_cam_to_device": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "n_windows": 5,
+    "run_dir": "/home/3195149/scenario_runs/official_v2_cand/id_w5",
+    "val_bacc": 0.8238095238095239,
+    "val_bacc_ci": [
+      0.7591527935277935,
+      0.9140877760524501
+    ],
+    "val_n": 143,
+    "val_n_no_embedding": 0,
+    "variant": "identita"
+  },
+  "rule": "max bacc CamFormer sulla val; a parit\u00e0 meno finestre, poi identit\u00e0",
+  "set_for_final_run": [
+    "poses.json_cam_to_device=[[1,0,0],[0,1,0],[0,0,1]]",
+    "window.n_windows=5"
+  ]
+}

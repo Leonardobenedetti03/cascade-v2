@@ -1,0 +1,9 @@
+2026-11-17 21:20:08,147 INFO scenario.select: stadio select, run_dir /home/3195149/scenario_runs/official_v2_cand/select
+2026-11-17 21:20:08,434 INFO scenario.select: identita       finestre=5  bacc val=0.8238  CI=[0.7591527935277935, 0.9140877760524501]  (/home/3195149/scenario_runs/official_v2_cand/id_w5)
+2026-11-17 21:20:08,438 INFO scenario.select: identita       finestre=3  bacc val=0.7905  CI=[0.7011180926916221, 0.8879542572463766]  (/home/3195149/scenario_runs/official_v2_cand/id_w3)
+2026-11-17 21:20:08,442 INFO scenario.select: diag(-1,-1,1)  finestre=5  bacc val=0.7891  CI=[0.6428983981804105, 0.9219942201359211]  (/home/3195149/scenario_runs/official_v2_cand/flip_w5)
+2026-11-17 21:20:08,445 INFO scenario.select: identita       finestre=1  bacc val=0.6794  CI=[0.5726943277310924, 0.7963059413580247]  (/home/3195149/scenario_runs/official_v2_cand/id_w1)
+2026-11-17 21:20:08,448 INFO scenario.select: diag(-1,-1,1)  finestre=3  bacc val=0.6593  CI=[0.5352599923970892, 0.7866446096049188]  (/home/3195149/scenario_runs/official_v2_cand/flip_w3)
+2026-11-17 21:20:08,452 INFO scenario.select: diag(-1,-1,1)  finestre=1  bacc val=0.5663  CI=[0.4403606564332364, 0.728358614146443]  (/home/3195149/scenario_runs/official_v2_cand/flip_w1)
+2026-11-17 21:20:08,456 INFO scenario.select: scelta: identita, 5 finestre. Run finale con:  --set 'poses.json_cam_to_device=[[1,0,0],[0,1,0],[0,0,1]]'  --set 'window.n_windows=5'
+2026-11-17 21:20:08,460 INFO scenario.select: fine select

@@ -1,0 +1,175 @@
+{
+  "camformer": {
+    "batch_size": 128,
+    "ckpt": "/home/3195149/seeing_without_pixels/checkpoints/egoexo4d_dur8.pt",
+    "context_s": 8.0,
+    "d_model": 128,
+    "device": "auto",
+    "dim_feedforward": 256,
+    "dropout": 0.1,
+    "max_missing_frac": 0.1,
+    "min_coverage": 0.9,
+    "nhead": 4,
+    "num_layers": 4,
+    "output_dim": 512,
+    "pose_encoding": "rel9d_grav",
+    "repo": "/home/3195149/seeing_without_pixels"
+  },
+  "check": {
+    "ci_above_chance": true,
+    "min_bacc": 0.4,
+    "min_recall": null,
+    "model": "camformer",
+    "require_all_classes": true,
+    "split": "val"
+  },
+  "data": {
+    "aria_csv_pattern": "/home/3185472/cascade_data/egoexo4d/takes/{take_name}/trajectory/closed_loop_trajectory.csv",
+    "expected_gap_takes": 52,
+    "expected_takes": 1273,
+    "max_missing_frac": 0.02,
+    "roots": [
+      "/home/3185472/egoexo4d_split_45G_physical",
+      "/home/3218863/Oasis_Deep_Vision_DSBA/egoexo4d_split_45G"
+    ],
+    "video_glob": "takes/{take_name}/frame_aligned_videos/downscaled/448/*214-1*.mp4"
+  },
+  "egovlp": {
+    "batch_size": 16,
+    "ckpt": "/home/3185472/cascade_data/egovlp_ckpt/egovlp.pth",
+    "crop": 256,
+    "depth": 12,
+    "device": "auto",
+    "embed_dim": 768,
+    "frame_indices": [
+      2,
+      6,
+      9,
+      13
+    ],
+    "img_size": 224,
+    "n_frames": 16,
+    "norm_mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "norm_std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "num_frames": 4,
+    "num_heads": 12,
+    "num_workers": 4,
+    "patch_size": 16,
+    "pre_resize": 256,
+    "proj_dim": 256,
+    "size": 224
+  },
+  "heads": {
+    "Cs": [
+      0.001,
+      0.01,
+      0.1,
+      1.0,
+      10.0,
+      100.0
+    ],
+    "ci_level": 0.95,
+    "class_weight": "balanced",
+    "inner_cv": 3,
+    "max_iter": 3000,
+    "min_takes_metric": 1,
+    "n_boot": 2000
+  },
+  "labels": {
+    "classes": [
+      "Basketball",
+      "Dance",
+      "Soccer",
+      "Cooking",
+      "Health",
+      "Bike repair"
+    ]
+  },
+  "poses": {
+    "fallback_to_json": false,
+    "fps": 20.0,
+    "json_cam_to_device": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "json_max_gap_frames": 15,
+    "json_src_fps": 30.0,
+    "json_world_rotation": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "source": "pose_json"
+  },
+  "run_dir": "/home/3195149/scenario_runs/official_v2_cand/select",
+  "split": {
+    "fold_seeds": [
+      0,
+      1,
+      2
+    ],
+    "mode": "official",
+    "n_folds": 5,
+    "official_val": {
+      "mode": "split",
+      "seed": 0,
+      "test_frac": 0.5
+    },
+    "site_to_fold": {
+      "cmu": 3,
+      "iiith": 3,
+      "indiana": 4,
+      "minnesota": 3,
+      "sfu": 2,
+      "unc": 1,
+      "uniandes": 0,
+      "upenn": 4,
+      "utokyo": 4
+    },
+    "test_sites": [
+      "georgiatech"
+    ],
+    "val_sites": [
+      "fair",
+      "nus"
+    ]
+  },
+  "window": {
+    "length_s": 8.0,
+    "n_windows": 1,
+    "placement": "center"
+  }
+}

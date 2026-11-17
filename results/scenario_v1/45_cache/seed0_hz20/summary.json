@@ -1,0 +1,30 @@
+{
+  "splits": {
+    "train": {
+      "n": 986,
+      "n_no_l0": 0,
+      "acc_L0": 0.9239350912778904,
+      "acc_L1": 1.0,
+      "y_rate": 0.07606490872210954
+    },
+    "val": {
+      "n": 143,
+      "n_no_l0": 0,
+      "acc_L0": 0.9090909090909091,
+      "acc_L1": 1.0,
+      "y_rate": 0.09090909090909091
+    },
+    "test": {
+      "n": 142,
+      "n_no_l0": 0
+    }
+  },
+  "counts": {
+    "n_scenario": 1273,
+    "n_out_of_head": 2,
+    "n_no_l1": 0
+  },
+  "n_windows": 5,
+  "scenario_run": "/mnt/beegfsstudents/home/3195149/scenario_runs/official_v2",
+  "warnings": []
+}

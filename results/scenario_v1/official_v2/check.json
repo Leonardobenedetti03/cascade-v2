@@ -1,0 +1,41 @@
+{
+  "bacc": 0.8238095238095239,
+  "bacc_ci": [
+    0.7591527935277935,
+    0.9140877760524501
+  ],
+  "bacc_classes": [
+    "Basketball",
+    "Dance",
+    "Soccer",
+    "Cooking",
+    "Health",
+    "Bike repair"
+  ],
+  "chance": 0.16666666666666666,
+  "ci_above_chance": true,
+  "ci_above_chance_required": true,
+  "ci_level": 0.95,
+  "classes_absent_in_train": [],
+  "classes_below_min_recall": [],
+  "classes_missing_in_split": [],
+  "classes_zero_recall": [],
+  "cond1_bacc_ok": true,
+  "cond2_recall_ok": true,
+  "cond3_all_classes_ok": true,
+  "min_bacc": 0.4,
+  "min_recall": null,
+  "model": "camformer",
+  "n_no_embedding": 0,
+  "passed": true,
+  "require_all_classes": true,
+  "split": "val",
+  "train_oof_recall": {
+    "Basketball": 0.9657894736842105,
+    "Bike repair": 0.6984126984126984,
+    "Cooking": 0.7282608695652174,
+    "Dance": 0.9821958456973294,
+    "Health": 0.8421052631578947,
+    "Soccer": 0.9473684210526315
+  }
+}

@@ -1,0 +1,49 @@
+split,system,class,procedural,acc,ci_low,ci_high,n_takes
+val,L0,Basketball,False,0.9523809523809523,0.8809523809523809,1.0,42
+val,L0,Dance,False,1.0,1.0,1.0,59
+val,L0,Soccer,False,0.8571428571428571,0.5714285714285714,1.0,7
+val,L0,Cooking,True,0.7333333333333333,0.4666666666666667,0.9333333333333333,15
+val,L0,Health,True,1.0,1.0,1.0,10
+val,L0,Bike repair,True,0.4,0.1,0.7,10
+val,L1,Basketball,False,1.0,1.0,1.0,42
+val,L1,Dance,False,1.0,1.0,1.0,59
+val,L1,Soccer,False,1.0,1.0,1.0,7
+val,L1,Cooking,True,1.0,1.0,1.0,15
+val,L1,Health,True,1.0,1.0,1.0,10
+val,L1,Bike repair,True,1.0,1.0,1.0,10
+val,fused,Basketball,False,1.0,1.0,1.0,42
+val,fused,Dance,False,1.0,1.0,1.0,59
+val,fused,Soccer,False,1.0,1.0,1.0,7
+val,fused,Cooking,True,1.0,1.0,1.0,15
+val,fused,Health,True,1.0,1.0,1.0,10
+val,fused,Bike repair,True,1.0,1.0,1.0,10
+val,cascade[lgbm_ABC],Basketball,False,1.0,1.0,1.0,42
+val,cascade[lgbm_ABC],Dance,False,1.0,1.0,1.0,59
+val,cascade[lgbm_ABC],Soccer,False,1.0,1.0,1.0,7
+val,cascade[lgbm_ABC],Cooking,True,1.0,1.0,1.0,15
+val,cascade[lgbm_ABC],Health,True,1.0,1.0,1.0,10
+val,cascade[lgbm_ABC],Bike repair,True,0.9,0.7,1.0,10
+test,L0,Basketball,False,0.9782608695652174,0.9347826086956522,1.0,46
+test,L0,Dance,False,1.0,1.0,1.0,56
+test,L0,Soccer,False,0.6666666666666666,0.3333333333333333,1.0,6
+test,L0,Cooking,True,0.875,0.6875,1.0,16
+test,L0,Health,True,0.6,0.3,0.9,10
+test,L0,Bike repair,True,0.625,0.25,0.875,8
+test,L1,Basketball,False,1.0,1.0,1.0,46
+test,L1,Dance,False,1.0,1.0,1.0,56
+test,L1,Soccer,False,1.0,1.0,1.0,6
+test,L1,Cooking,True,1.0,1.0,1.0,16
+test,L1,Health,True,1.0,1.0,1.0,10
+test,L1,Bike repair,True,1.0,1.0,1.0,8
+test,fused,Basketball,False,1.0,1.0,1.0,46
+test,fused,Dance,False,1.0,1.0,1.0,56
+test,fused,Soccer,False,1.0,1.0,1.0,6
+test,fused,Cooking,True,1.0,1.0,1.0,16
+test,fused,Health,True,1.0,1.0,1.0,10
+test,fused,Bike repair,True,1.0,1.0,1.0,8
+test,cascade[lgbm_ABC],Basketball,False,1.0,1.0,1.0,46
+test,cascade[lgbm_ABC],Dance,False,1.0,1.0,1.0,56
+test,cascade[lgbm_ABC],Soccer,False,1.0,1.0,1.0,6
+test,cascade[lgbm_ABC],Cooking,True,1.0,1.0,1.0,16
+test,cascade[lgbm_ABC],Health,True,1.0,1.0,1.0,10
+test,cascade[lgbm_ABC],Bike repair,True,1.0,1.0,1.0,8
