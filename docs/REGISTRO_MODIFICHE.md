@@ -26,6 +26,7 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M16 | `results/` nel repository | Risultati solo sull'HPC e in un backup | Ogni numero del report ha run e commit | previsto dopo le run |
 | M17 | CamFormer dal checkpoint del paper, encoder congelato, si allena solo la testa; EgoVLP invariato (congelato, testa logistica) | v1: checkpoint con fine-tuning end-to-end; blueprint (M04): da zero | Decisione del gruppo (16/11): modelli pre-addestrati su molti più dati, si addestrano solo i classificatori. Limiti dichiarati in N24 | previsto (C14d) |
 | M18 | L0 e L1 da `scenario_preds` (teste logistiche su CamFormer ed EgoVLP congelati, 6 classi, 3 seed), cache del gate dallo stadio 44 al posto di 00–45; divisione ufficiale con la val tagliata a metà (val/test) | Stadi 00–45 di cascade-v2, divisione per sito (M02/M03) | Il controllo su L0 della run `site_v2` è fallito (siti mai visti per CamFormer congelato); la divisione per sito resta analisi secondaria. Dettagli in N28–N31 | previsto (C15) |
+| M19 | Valutazione aggiuntiva in CV annidata per sessione su tutte le 1271 take (stadio 56, gate v2): teste, gate, calibratore e soglie rifatti dentro ogni fold; regole a costo e a rischio garantito; opzioni per sessione nel gate v1 | Una sola divisione val/test; punto di lavoro su 143 take, al bordo | Analisi di Giorgio del 18/11. Si aggiunge, non sostituisce: N33 e N34 restano la prima valutazione. Dettagli in N37 | previsto (C22) |
 
 ## Note di lavorazione
 
@@ -517,3 +518,76 @@ i file di lavoro. Il codice non è stato riformattato: è escluso da black e ruf
 `third_party`) e i suoi test si lanciano dalla sua cartella (`cd scenario_preds && python -m pytest -q`), non con
 quelli del repo. `hpc/env.sh` contiene solo percorsi e account di default del cluster; i valori personali vanno in
 `hpc/env.local.sh`, non versionato.
+
+**N37 — BOZZA da approvare con Giorgio prima della run: gate v2 (stadio 56) e correzioni del gate v1 (18/11).**
+Dopo N34 il test ufficiale non può più giudicare un metodo cambiato dopo averlo visto. Il gate v2 rifà la
+valutazione con una CV annidata per sessione su tutte le take delle 6 classi. **Non è una valutazione cieca**: val e
+test ufficiali sono già stati analizzati (N33, N34 e l'analisi del 18/11, in cui la sessione `georgiatech_bike_06` ha
+motivato la regola a rischio); la scelta delle pose e delle 5 finestre (`select`, N33) è stata fatta sulla val. I
+risultati di N33 e N34 restano riportati come "prima valutazione".
+- Correzioni del gate v1 (`gate/protocol.py`, `eval/gate_eval.py`, `eval/curves.py`, `configs/gate.yaml`):
+  opzioni `gate.inner_cv_groups` e `gate.bootstrap_unit` (`take` | `session`). Con `session` la CV interna dei gate
+  raggruppa per sessione (prima raggruppava per take, cioè per riga: nessun raggruppamento) e gli intervalli di
+  curve, confronti, AUROC e accuratezza per classe ricampionano le sessioni. Senza colonna `session` nella cache si
+  torna alla take con un avviso. **Default `take` in `configs/gate.yaml`**: la run `scenario_v1` (N33, N34) resta
+  riproducibile con lo stadio 50 così com'è; la versione per sessione si attiva con
+  `--config configs/hpc/gate_v1_session.yaml`. Il gate v2 (stadio 56) lavora sempre per sessione.
+- `src/cascade/scenario_io.py`: `compute_windows`, `take_motion`, `load_npz` spostate dallo stadio 44 senza
+  modifiche, per calcolare il moto del gate v2 come nella cache del v1.
+- Nuovo pacchetto `src/cascade/gatev2/` e stadio `scripts/56_gate_v2.py` (CPU; `hpc/gate_v2.sh`). Legge le
+  embedding congelate di scenario_preds (non le predizioni) e, per ogni fold esterna k (per sessione, stratificata):
+  (1) CV interna per sessione delle teste di CamFormer sul train esterno -> predizioni fuori campione su cui si
+  addestra il gate; (2) cross-fitting per sessione del gate -> score fuori campione per calibratore e soglie;
+  (3) teste rifatte sul train esterno, gate, calibratore e soglie congelati e applicati alla fold k. Teste come in
+  official_v2 (logistica, `class_weight: balanced`, C e temperatura in CV per sessione). Target del gate e = 1 − c0
+  (con EgoVLP sempre corretto coincide con il beneficio atteso); se EgoVLP sbaglia il log lo segnala.
+- Gate: `thr_maxprob` (riferimento), `logreg_A`, `logreg_AC`, `logreg_ABC` (logistiche SENZA pesi di classe),
+  `lgbm_ABC` (secondario, per continuità con la v1; fuori dai confronti pre-registrati), `class_rule` (scala le
+  procedurali predette). Feature come la v1 ma con il logit di p_max; l'affidabilità per classe
+  (B) esclude la sessione della riga. Calibratore Platt su score fuori campione, `r_up` = quantile 90% su 200
+  bootstrap per sessione.
+- Regole (tutte fissate sul train esterno, applicate alla fold esterna): `cost` (scala se `r_up` ≥ β; variante
+  `cost_hat` con `r_hat`), `risk` (copertura massima con limite di Clopper-Pearson ≤ α su una griglia fissa di 20
+  coperture, ognuna al livello 1 − δ/20: Bonferroni; la sequenza fissa proposta il 18/11 si fermerebbe subito perché
+  con poche take tenute il limite è largo), `acc_target` (≤ 1% di errori lasciati passare, come `within_pts`),
+  `budget` (10, 20, 30%).
+- **Valori da pre-registrare** (default di `configs/gate_v2.yaml`): fold 5/5/5, 3 partizioni esterne (seed 0, 1, 2),
+  β ∈ {0,01; 0,02; 0,05; 0,10; 0,20}, α ∈ {0,02; 0,05; 0,10}, δ = 0,1, costi per finestra L0 0,121627 e L1 92,430496 GMACs
+  (stadio 40 di scenario_v1, 5 finestre). **Risultato principale: take non viste dal pre-addestramento di CamFormer
+  (`pretrain_unseen`), `thr_maxprob`, regola a costo con β = 0,05**. β è il prezzo di una chiamata a EgoVLP in errori, una scelta di valore e non un
+  parametro da ottimizzare: il risultato si riporta come **curva su tutti i β** (errori lasciati contro quota a
+  EgoVLP), e **nessun β viene scelto dopo aver visto i risultati**. β = 0,05 è solo il punto del sommario e dei
+  confronti; qualunque altro β indicato come "migliore" a posteriori va presentato come analisi esplorativa. Metriche:
+  accuratezza e quota mandata a EgoVLP ("camera accesa"), con IC 95% bootstrap per sessione (1000 ricampionamenti).
+  Secondari: tutte le take, `pretrain_seen`, val + test ufficiali (`official_eval`), le altre regole e parametri.
+- Confronti pre-registrati (A − B, AUROC, accuratezza e quota a EgoVLP al punto principale, correzione di Holm per
+  sottoinsieme e metrica): `logreg_A` − `thr_maxprob`, `logreg_AC` − `logreg_A` (moto), `logreg_ABC` − `logreg_AC`
+  (affidabilità per classe), `thr_maxprob` − `class_rule` (decisione per take contro regola per classe; la regola per
+  classe usa la sua decisione naturale). Analisi pre-registrata: dentro le take predette procedurali, quante restano
+  su CamFormer e quante di queste sono corrette (`procedural.csv`).
+- Costo contro solo EgoVLP (`cost_vs_egovlp.csv`, aggiunta del 18/11 prima della run): per ogni β della regola a
+  costo, per `class_rule` e per i riferimenti, GMACs per take della cascata (5 × (C_L0 + ρ · C_L1)) contro
+  5 × C_L1 di EgoVLP da solo su tutte le take (senza CamFormer davanti), con quota, risparmio, fattore di
+  riduzione, totali sul sottoinsieme e intervallo dal bootstrap per sessione di ρ. Il punto al β principale
+  (0,05) va in `summary.json` (`cost_vs_egovlp_primary`) e nel log.
+- Analisi descrittiva aggiuntiva (script separato, dopo la run, sugli output dello stadio 56): correttezza di
+  CamFormer fuori campione contro `mot_energy` con effetti fissi di classe (regressione logistica), per separare
+  l'effetto del moto da quello della classe (nella v1 il quintile più fermo era quasi tutto procedurale).
+- Limiti da dichiarare: Clopper-Pearson assume take indipendenti (le sessioni no: la garanzia di `risk` è ottimista,
+  da leggere con l'IC per sessione); il pre-addestramento di CamFormer ha visto 936 delle 1273 take, che nella CV
+  entrano anche in valutazione (per questo il risultato principale è su `pretrain_unseen`); le teste sul train esterno
+  usano più dati di quelle interne su cui si addestra il gate (variante `outer_l0: inner_mean` per controllo);
+  il calibratore impara soprattutto da take viste dal pre-addestramento (meno errori), quindi sulle non viste può
+  sottostimare il rischio (controllo: `calibration.csv` per sottoinsieme); il
+  costo conta solo i GMACs (`extra_gmacs_L0`/`extra_gmacs_L1` per la sensibilità, da misurare).
+- Manifest: `STAGE_KEYS["56_gate_v2"] = ["gate_v2", "data.vertical_axis"]`. Senza chiavi lo stadio 56 non
+  registrava la config e una run con `gate_v2` cambiato risultava "già completata"; ora dà errore come gli altri
+  stadi. `hpc/gate_v2.sh`: limite di tempo 4 h (durata sui dati veri non ancora misurata).
+- Test: `tests/test_gatev2.py` (17, compreso `test_stage_56_refuses_changed_gate_v2_config`): limite di Clopper-Pearson (0,0237 con 0 errori su 96, δ = 0,1), regola a rischio
+  con Bonferroni, soglie di `acc_target` e `budget`, regola a costo = β, calibratore (rischio ritrovato, `r_up` ≥
+  `r_hat`, più largo con meno dati, una sola classe, isotona), fold per sessione, affidabilità senza la propria
+  sessione, **nessuna take della fold esterna in una testa o in un gate di quella fold** e cross-fitting corretto,
+  catena dello stadio 56 su una run finta, punto principale fuori griglia rifiutato; correzioni del v1 (gruppi della
+  CV, pesi bootstrap per sessione, IC più larghi con sessioni omogenee). Suite: 307 passati, 10 saltati; i 5 test che
+  richiedono `torch`/`av` (stadi 10 e 44) non girano nella sandbox, la catena 44 → 50 `--final` → 53 è stata
+  provata a mano con lo stadio 40 simulato.

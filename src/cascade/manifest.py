@@ -130,6 +130,9 @@ for _stage in SPLIT_DEPENDENT_STAGES:
 # delle traiettorie deve invalidare frame, feature, predizioni e cache. Lo stadio 00 prende anche l'hash dello
 # split (un CSV cambiato a parità di nome cambia clips.csv) e il 41 ha finalmente le sue chiavi.
 STAGE_KEYS["00_inventory"].append("paths.split_sha256")
+# N37: senza chiavi il manifest dello stadio 56 non registrava la config e una run con gate_v2 cambiato
+# risultava "già completata". Il percorso della run di scenario_preds è nell'extra del manifest.
+STAGE_KEYS["56_gate_v2"] = ["gate_v2", "data.vertical_axis"]
 STAGE_KEYS["41_cost_e2e"] = [
     "cost_e2e",
     "cost.device",

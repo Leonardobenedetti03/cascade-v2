@@ -1,0 +1,40 @@
+# Gate v2 (N37, stadio 56): CV annidata per sessione su tutte le take di scenario_preds.
+# Tutti i valori qui sotto vanno fissati nel registro (N37) PRIMA della run: dopo non si cambiano.
+gate_v2:
+  outer_folds: 5          # livello 3: ogni take è valutata da modelli che non hanno visto la sua sessione
+  inner_folds: 5          # livello 1: predizioni fuori campione di CamFormer su cui si addestra il gate
+  gate_folds: 5           # livello 2: cross-fitting di gate, calibratore e soglie
+  repeats: [0, 1, 2]      # partizioni esterne diverse; decisioni mediate per take
+  outer_l0: refit         # refit | inner_mean (allineamento con le predizioni su cui si addestra il gate)
+  heads:                  # come la testa di official_v2 (scenario_preds/configs/default.yaml)
+    Cs: [0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
+    inner_cv: 3
+    max_iter: 3000
+    class_weight: balanced
+  scorers: [thr_maxprob, logreg_A, logreg_AC, logreg_ABC, lgbm_ABC, class_rule]  # lgbm_ABC: secondario (continuità con la v1), fuori dai confronti
+  primary_scorer: thr_maxprob
+  logreg_Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
+  logreg_inner_cv: 3
+  reliability_alpha: 1.0
+  calibration: platt      # platt | isotonic
+  calibration_boot: 200   # bootstrap per sessione del calibratore (r_up)
+  delta: 0.1              # r_up = quantile 90%; garanzia della regola a rischio al 90%
+  betas: [0.01, 0.02, 0.05, 0.10, 0.20]  # regola a costo: 100, 50, 20, 10, 5 chiamate a EgoVLP per errore evitato
+  alphas: [0.02, 0.05, 0.10]          # regola a rischio: errore massimo tra le take lasciate a CamFormer
+  risk_grid: 20                       # coperture candidate (Bonferroni su 20)
+  max_error_rates: [0.01]             # come within_pts della v1 (riferimento)
+  budgets: [0.1, 0.2, 0.3]
+  primary_rule: cost
+  primary_param: 0.05    # solo il punto del sommario: il risultato è la curva su tutti i β (N37)
+  subsets: [all, pretrain_unseen, pretrain_seen, official_eval]
+  primary_subset: pretrain_unseen     # take non viste dal pre-addestramento di CamFormer
+  comparisons:                        # coppie pre-registrate A − B, correzione di Holm
+    - [logreg_A, thr_maxprob]         # un gate appreso sulla confidenza batte la soglia?
+    - [logreg_AC, logreg_A]           # effetto del moto
+    - [logreg_ABC, logreg_AC]         # effetto dell'affidabilità per classe
+    - [thr_maxprob, class_rule]       # decisione per take contro regola per classe
+  bootstrap: 1000
+  bootstrap_seed: 0
+  gmacs_per_window: {L0: 0.121627, L1: 92.430496}   # stadio 40 di scenario_v1 (operating_point.csv / 5 finestre)
+  extra_gmacs_L0: [0.0]   # sensibilità: costo della traiettoria per finestra (da misurare)
+  extra_gmacs_L1: [0.0]   # sensibilità: decodifica dei frame per finestra (da misurare)

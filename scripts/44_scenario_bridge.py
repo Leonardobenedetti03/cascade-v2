@@ -40,52 +40,11 @@ import pandas as pd  # noqa: E402
 from src.cascade.cache.schema import add_labels, validate_cache  # noqa: E402
 from src.cascade.cli import open_stage, stage_parser  # noqa: E402
 from src.cascade.io import read_json, write_json  # noqa: E402
-from src.cascade.motion import MOTION_FEATURES, motion_features  # noqa: E402
+from src.cascade.scenario_io import compute_windows, load_npz, take_motion  # noqa: E402,F401
 from src.data.cache import Table, write_table  # noqa: E402
 
 STAGE = "45_cache"  # stesso manifest dello stadio 45: lo stadio 50 lo richiede invariato
 EPS = 1e-12
-
-
-def compute_windows(duration_s: float, length_s: float, n_windows: int, placement: str) -> List[Tuple[float, float]]:
-    """Copia di ``scenario/windows.py::compute_windows`` (stesse finestre delle embedding)."""
-    if not np.isfinite(duration_s) or duration_s <= 0:
-        return []
-    if duration_s <= length_s:
-        return [(0.0, float(duration_s))]
-    if placement == "uniform":
-        centers = [(i + 0.5) * duration_s / n_windows for i in range(n_windows)]
-    elif placement == "center":
-        mid = duration_s / 2.0
-        centers = [mid + (i - (n_windows - 1) / 2.0) * length_s for i in range(n_windows)]
-    else:
-        raise ValueError(f"window.placement sconosciuto: {placement!r}")
-    out = []
-    for c in centers:
-        start = min(max(c - length_s / 2.0, 0.0), duration_s - length_s)
-        w = (round(start, 6), round(start + length_s, 6))
-        if w not in out:
-            out.append(w)
-    return out
-
-
-def take_motion(traj_path: Path, windows, fps: float, vertical_axis: int) -> dict:
-    """Feature di moto mediate sulle finestre; NaN se la traiettoria manca (il gate le imputa)."""
-    if not traj_path.exists() or not windows:
-        return {k: float("nan") for k in MOTION_FEATURES}
-    with np.load(traj_path) as z:
-        t, poses, valid = z["t"], z["poses"], z["valid"].astype(bool)
-    feats = []
-    for t0, t1 in windows:
-        sel = (t >= t0) & (t < t1) & valid
-        feats.append(motion_features(poses[sel], fps, vertical_axis))
-    with np.errstate(all="ignore"):
-        return {k: float(np.nanmean([f[k] for f in feats])) if feats else float("nan") for k in MOTION_FEATURES}
-
-
-def load_npz(path: Path) -> dict:
-    with np.load(path) as z:
-        return {str(n): x for n, x in zip(z["take_name"], z["X"])}
 
 
 def build(scen_dir: Path, ctx, include_test: bool, gmacs: Tuple[float, float]):

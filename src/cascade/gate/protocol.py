@@ -29,6 +29,20 @@ log = logging.getLogger(__name__)
 TARGET_COLUMN = {"hard": "y", "c1": "c1"}  # gate.target → colonna della tabella
 
 
+def cv_groups(df, unit: str) -> np.ndarray:
+    """Gruppi della CV interna dei gate (N37): ``session`` se richiesto e presente, altrimenti la take.
+
+    Con una riga per take (cache dello stadio 44) i gruppi per take non raggruppano nulla: take della
+    stessa sessione finivano sia nel fit sia nella validazione interna (scelta di C ottimista)."""
+    if unit == "session":
+        if "session" in df.columns:
+            return df.session.astype(str).to_numpy()
+        log.warning("gate.inner_cv_groups = session ma la cache non ha la colonna session: gruppi per take")
+    elif unit != "take":
+        raise ValueError(f"gate.inner_cv_groups sconosciuto: {unit!r} (take | session)")
+    return df.take_uid.astype(str).to_numpy()
+
+
 @dataclass
 class GateResult:
     name: str
@@ -45,7 +59,7 @@ def run_gate(table, labels, gcfg, name: str, seed: int = 0) -> GateResult:
     split = df.split.to_numpy()
     fold = df.fold.to_numpy().astype(int)
     y = df[TARGET_COLUMN[gate.target]].to_numpy().astype(int)
-    take = df.take_uid.astype(str).to_numpy()
+    take = cv_groups(df, getattr(gcfg, "inner_cv_groups", "take"))
     c0, c1 = df.c0.to_numpy(), df.c1.to_numpy()
     train = np.flatnonzero(split == "train")
     other = np.flatnonzero(split != "train")

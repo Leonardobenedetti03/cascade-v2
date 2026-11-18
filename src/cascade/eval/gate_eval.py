@@ -47,6 +47,7 @@ from src.cascade.eval.curves import (
     curve_metrics,
     escalation_order,
     evaluate_masks,
+    group_resample_weights,
     mean_curve,
     resample_weights,
     threshold_for_budget,
@@ -160,6 +161,7 @@ class SplitData:
     gmacs_L0: float
     gmacs_L1: float
     min_takes: int = 1  # bacc: classi con almeno ``min_takes`` take nello split
+    session: Optional[np.ndarray] = None  # per riga, se la cache ha la colonna session (N37)
 
     @classmethod
     def build(cls, table, split: str, min_takes: int = 1) -> SplitData:
@@ -180,7 +182,30 @@ class SplitData:
             float(df.gmacs_L0.iloc[0]) if has else float("nan"),
             float(df.gmacs_L1.iloc[0]) if has else float("nan"),
             int(min_takes),
+            df.session.astype(str).to_numpy() if "session" in df.columns else None,
         )
+
+    def row_groups(self, unit: str) -> np.ndarray:
+        """Gruppo del bootstrap per ogni riga: la sessione (``unit = session``) o la take (N37)."""
+        if unit == "session":
+            if self.session is not None:
+                return self.session
+            log.warning("gate.bootstrap_unit = session ma la cache non ha la colonna session: bootstrap per take")
+        elif unit != "take":
+            raise ValueError(f"gate.bootstrap_unit sconosciuto: {unit!r} (take | session)")
+        return np.asarray(self.take_uid).astype(str)
+
+    def take_groups(self, unit: str) -> np.ndarray:
+        """Gruppo di ogni take nell'ordine delle colonne delle curve (``np.unique`` di ``take_uid``)."""
+        uniq, first = np.unique(np.asarray(self.take_uid).astype(str), return_index=True)
+        return self.row_groups(unit)[first]
+
+    def boot_weights(self, n_boot: int, seed: int, unit: str) -> np.ndarray:
+        """Pesi bootstrap ``[B, T]`` delle take: per take (come la v1) o per sessione."""
+        T = len(np.unique(np.asarray(self.take_uid).astype(str)))
+        if unit == "take":
+            return resample_weights(T, n_boot, seed)
+        return group_resample_weights(self.take_groups(unit), n_boot, seed)
 
     @property
     def curve_args(self) -> dict:
@@ -517,8 +542,13 @@ def comparison_rows(curves, bm, pairs, split: str, gcfg) -> List[dict]:
 
 
 # --------------------------------------------------------------------------- AUROC e calibrazione dello score
-def _take_resample_indices(take_uid: np.ndarray, B: int, seed: int) -> List[np.ndarray]:
-    uniq, inv = np.unique(np.asarray(take_uid).astype(str), return_inverse=True)
+def _unit(gcfg) -> str:
+    return getattr(gcfg, "bootstrap_unit", "take")
+
+
+def _take_resample_indices(groups: np.ndarray, B: int, seed: int) -> List[np.ndarray]:
+    """Indici di riga per B ricampionamenti dei gruppi (take o sessioni, N37) con reinserimento."""
+    uniq, inv = np.unique(np.asarray(groups).astype(str), return_inverse=True)
     members = [np.flatnonzero(inv == g) for g in range(len(uniq))]
     rng = np.random.default_rng(seed)
     return [np.concatenate([members[g] for g in rng.integers(0, len(uniq), len(uniq))]) for _ in range(B)]
@@ -526,7 +556,7 @@ def _take_resample_indices(take_uid: np.ndarray, B: int, seed: int) -> List[np.n
 
 def auc_rows(results, sd: SplitData, gcfg, n_boot: int) -> List[dict]:
     rows = []
-    idxs = _take_resample_indices(sd.take_uid, n_boot, gcfg.bootstrap_seed) if n_boot else []
+    idxs = _take_resample_indices(sd.row_groups(_unit(gcfg)), n_boot, gcfg.bootstrap_seed) if n_boot else []
     for name, res in results.items():
         if res[0].fixed_r is not None or name == "oracle":
             continue
@@ -619,7 +649,8 @@ def diag_c1_rows(results, sd: SplitData, gcfg, p_max: np.ndarray) -> List[dict]:
     if sd.name not in DIAG_SPLITS:
         raise ValueError(f"diag_c1: split {sd.name!r} non ammesso (solo {DIAG_SPLITS})")
     rows = []
-    idxs = _take_resample_indices(sd.take_uid, gcfg.bootstrap, gcfg.bootstrap_seed) if sd.name == "val" else []
+    groups = sd.row_groups(_unit(gcfg))
+    idxs = _take_resample_indices(groups, gcfg.bootstrap, gcfg.bootstrap_seed) if sd.name == "val" else []
     for name, res in results.items():
         if not name.startswith("compare_") or res[0].fixed_r is not None:
             continue
@@ -725,9 +756,20 @@ def _take_level(p: np.ndarray, label_idx: np.ndarray, take_uid: np.ndarray):
     return agg.argmax(1), lab
 
 
-def per_class_rows(systems: Dict[str, np.ndarray], sd: SplitData, labels, n_boot: int, seed: int):
+def _group_boot_means(x: np.ndarray, groups: np.ndarray, n_boot: int, rng) -> np.ndarray:
+    """Medie bootstrap di ``x`` ricampionando i gruppi; con un gruppo per elemento = bootstrap semplice."""
+    _, inv = np.unique(np.asarray(groups).astype(str), return_inverse=True)
+    G = int(inv.max()) + 1
+    s = np.bincount(inv, weights=x, minlength=G)
+    n = np.bincount(inv, minlength=G).astype(float)
+    pick = rng.integers(0, G, (n_boot, G))
+    return s[pick].sum(1) / n[pick].sum(1)
+
+
+def per_class_rows(systems: Dict[str, np.ndarray], sd: SplitData, labels, n_boot: int, seed: int, unit: str = "take"):
     pc, conf = [], []
     rng = np.random.default_rng(seed)
+    tg = sd.take_groups(unit)
     for sys_name, p in systems.items():
         pred, lab = _take_level(p, sd.label_idx, sd.take_uid)
         for c in range(labels.num_classes):
@@ -735,7 +777,7 @@ def per_class_rows(systems: Dict[str, np.ndarray], sd: SplitData, labels, n_boot
             if not m.any():
                 continue
             corr = (pred[m] == c).astype(float)
-            boots = corr[rng.integers(0, len(corr), (n_boot, len(corr)))].mean(1) if n_boot else np.array([])
+            boots = _group_boot_means(corr, tg[m], n_boot, rng) if n_boot else np.array([])
             lo, hi, _ = _ci(boots) if n_boot else (np.nan, np.nan, np.nan)
             pc.append(
                 {
@@ -806,7 +848,9 @@ def evaluate(table, labels, cfg, *, final: bool) -> Dict[str, object]:
             curves_val = curves
         bm = None
         if s != "train" and gcfg.bootstrap > 0:
-            W = resample_weights(curves["random"].correct.shape[1], gcfg.bootstrap, gcfg.bootstrap_seed)
+            W = sd.boot_weights(gcfg.bootstrap, gcfg.bootstrap_seed, _unit(gcfg))
+            if W.shape[1] != curves["random"].correct.shape[1]:
+                raise RuntimeError("pesi bootstrap e take delle curve non allineati")
             bm = bootstrap_metrics(curves, W, gcfg)
             out["comparisons"] += comparison_rows(curves, bm, gcfg.comparisons, s, gcfg)
             out["curve_bands"] += band_rows(curves, W, s)
@@ -829,7 +873,7 @@ def evaluate(table, labels, cfg, *, final: bool) -> Dict[str, object]:
             if ref is not None:
                 esc = escalate_at_operating_point(ref, results[ref][0], thresholds[ref][0], rates.get(ref, 0.0), sd)
                 systems[f"cascade[{ref}]"] = np.where(esc[:, None], sd.p_fused, sd.p_cam)
-            pc, conf = per_class_rows(systems, sd, labels, gcfg.bootstrap, gcfg.bootstrap_seed)
+            pc, conf = per_class_rows(systems, sd, labels, gcfg.bootstrap, gcfg.bootstrap_seed, _unit(gcfg))
             out["per_class"] += pc
             out["confusion"] += conf
     if "val" in sds and "test" in sds:  # RQ1: la soglia di val applicata al test (solo con --final)

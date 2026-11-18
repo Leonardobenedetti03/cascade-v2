@@ -1,7 +1,7 @@
 """Configurazione: YAML in ``configs/`` → dataclass tipizzate.
 
 Ordine di merge (l'ultimo vince):
-``base.yaml`` → ``camformer.yaml`` → ``egovlp.yaml`` → ``gate.yaml`` →
+``base.yaml`` → ``camformer.yaml`` → ``egovlp.yaml`` → ``gate.yaml`` → ``gate_v2.yaml`` →
 ``synthetic.yaml`` (solo con ``--synthetic``) → file passati con ``--config`` →
 override ``--set sezione.chiave=valore`` (valore parsato come YAML).
 
@@ -19,7 +19,7 @@ import yaml
 
 from src import CONFIGS_DIR
 
-BASE_FILES = ("base.yaml", "camformer.yaml", "egovlp.yaml", "gate.yaml")
+BASE_FILES = ("base.yaml", "camformer.yaml", "egovlp.yaml", "gate.yaml", "gate_v2.yaml")
 SYNTHETIC_FILE = "synthetic.yaml"
 
 
@@ -237,9 +237,73 @@ class GateCfg:
     operating_rule: str = "budget"  # budget | within_pts (N28: minimo costo entro within_pts da always_L1 su val)
     bootstrap: int = 1000
     bootstrap_seed: int = 0
+    # N37: unità del bootstrap (take | session) e gruppi della CV interna dei gate (take | session).
+    # Con session e senza colonna session nella cache si torna alla take, con un avviso nel log.
+    bootstrap_unit: str = "take"
+    inner_cv_groups: str = "take"
     comparisons: List[List[str]] = field(default_factory=list)  # coppie [A, B] per A − B (RQ2)
     reference: List[str] = field(default_factory=list)  # gate per la cascata per classe
     compare: CompareCfg = field(default_factory=CompareCfg)
+
+
+@dataclass
+class GateV2HeadsCfg:
+    """Teste lineari rifatte dentro la CV annidata (stesso protocollo di scenario_preds/heads.py)."""
+
+    Cs: List[float] = field(default_factory=lambda: [0.001, 0.01, 0.1, 1.0, 10.0, 100.0])
+    inner_cv: int = 3  # CV per sessione che sceglie C e la temperatura
+    max_iter: int = 3000
+    class_weight: str = "balanced"  # balanced | none (come la testa di official_v2)
+
+
+@dataclass
+class GateV2Cfg:
+    """Gate v2 (N37, stadio 56): CV annidata per sessione su tutte le take, regole a costo e a rischio.
+
+    Livelli per ogni fold esterna k: (1) CV interna per sessione delle teste di CamFormer sul train esterno
+    -> predizioni fuori campione su cui si addestra il gate; (2) cross-fitting per sessione del gate sul train
+    esterno -> score fuori campione per calibratore e soglie; (3) teste, gate, calibratore e soglie congelati
+    e applicati alla fold k."""
+
+    outer_folds: int = 5
+    inner_folds: int = 5  # livello 1
+    gate_folds: int = 5  # livello 2
+    repeats: List[int] = field(default_factory=lambda: [0, 1, 2])  # seed delle partizioni esterne
+    outer_l0: str = "refit"  # refit (testa su tutto il train esterno) | inner_mean (media dei modelli interni)
+    heads: GateV2HeadsCfg = field(default_factory=GateV2HeadsCfg)
+    scorers: List[str] = field(
+        default_factory=lambda: ["thr_maxprob", "logreg_A", "logreg_AC", "logreg_ABC", "lgbm_ABC", "class_rule"]
+    )
+    primary_scorer: str = "thr_maxprob"
+    logreg_Cs: List[float] = field(default_factory=lambda: [0.001, 0.01, 0.1, 1.0, 10.0])
+    logreg_inner_cv: int = 3
+    lgbm: Dict[str, Any] = field(default_factory=dict)
+    reliability_alpha: float = 1.0
+    calibration: str = "platt"  # platt | isotonic
+    calibration_boot: int = 200  # repliche bootstrap per sessione del calibratore (r_up)
+    delta: float = 0.1  # r_up = quantile 1 − δ; livello della garanzia della regola a rischio
+    betas: List[float] = field(default_factory=lambda: [0.01, 0.02, 0.05, 0.10, 0.20])
+    alphas: List[float] = field(default_factory=lambda: [0.02, 0.05, 0.10])
+    risk_grid: int = 20  # coperture candidate 1/G, 2/G, ..., 1 (Bonferroni su G)
+    max_error_rates: List[float] = field(default_factory=lambda: [0.01])  # regola acc_target (come within_pts)
+    budgets: List[float] = field(default_factory=lambda: [0.1, 0.2, 0.3])
+    primary_rule: str = "cost"
+    primary_param: float = 0.05
+    subsets: List[str] = field(default_factory=lambda: ["all", "pretrain_unseen", "pretrain_seen", "official_eval"])
+    primary_subset: str = "pretrain_unseen"
+    comparisons: List[List[str]] = field(
+        default_factory=lambda: [
+            ["logreg_A", "thr_maxprob"],
+            ["logreg_AC", "logreg_A"],
+            ["logreg_ABC", "logreg_AC"],
+            ["thr_maxprob", "class_rule"],
+        ]
+    )
+    bootstrap: int = 1000
+    bootstrap_seed: int = 0
+    gmacs_per_window: Dict[str, float] = field(default_factory=lambda: {"L0": 0.121627, "L1": 92.430496})
+    extra_gmacs_L0: List[float] = field(default_factory=lambda: [0.0])  # sensibilità: traiettoria per finestra
+    extra_gmacs_L1: List[float] = field(default_factory=lambda: [0.0])  # sensibilità: decodifica per finestra
 
 
 @dataclass
@@ -293,6 +357,7 @@ class Config:
     cost_e2e: CostE2ECfg = field(default_factory=CostE2ECfg)
     site_diag: SiteDiagCfg = field(default_factory=SiteDiagCfg)
     gate: GateCfg = field(default_factory=GateCfg)
+    gate_v2: GateV2Cfg = field(default_factory=GateV2Cfg)
     synthetic: SyntheticCfg = field(default_factory=SyntheticCfg)
 
     def to_dict(self) -> Dict[str, Any]:

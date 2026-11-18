@@ -225,6 +225,20 @@ def resample_weights(n_takes: int, n_boot: int, seed: int) -> np.ndarray:
     return rng.multinomial(n_takes, np.full(n_takes, 1.0 / n_takes), size=n_boot).astype(float)
 
 
+def group_resample_weights(take_groups: np.ndarray, n_boot: int, seed: int) -> np.ndarray:
+    """Pesi bootstrap ``[B, T]`` ricampionando i GRUPPI (es. sessioni) con reinserimento (N37).
+
+    ``take_groups[t]`` è il gruppo della take t, nell'ordine delle take della curva (``np.unique`` di
+    ``take_uid``). Ogni gruppo estratto porta con sé tutte le sue take: il peso di una take è il numero
+    di volte che il suo gruppo è stato estratto. Con un gruppo per take coincide in distribuzione con
+    :func:`resample_weights`."""
+    _, inv = np.unique(np.asarray(take_groups).astype(str), return_inverse=True)
+    G = int(inv.max()) + 1
+    rng = np.random.default_rng(seed)
+    counts = rng.multinomial(G, np.full(G, 1.0 / G), size=n_boot).astype(float)  # [B, G]
+    return counts[:, inv]
+
+
 def boot_curves(c: CurveData, W: np.ndarray):
     """(acc [B, R], cost [B, R]) ricampionando le take con i pesi ``W``.
 

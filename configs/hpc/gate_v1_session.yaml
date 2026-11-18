@@ -1,0 +1,5 @@
+# Gate v1 (stadio 50) con bootstrap e CV interna dei gate per sessione (N37). Non usato per N33/N34.
+#   python scripts/50_gate_eval.py ... --config configs/hpc/gate_v1_session.yaml
+gate:
+  bootstrap_unit: session
+  inner_cv_groups: session

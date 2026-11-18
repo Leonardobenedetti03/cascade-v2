@@ -48,5 +48,10 @@ gate:
   operating_rule: within_pts
   bootstrap: 1000
   bootstrap_seed: 0
+  # N37: unità del bootstrap e gruppi della CV interna dei gate (take | session). Default take = come la run
+  # scenario_v1 (N33, N34), che resta così riproducibile. La versione per sessione si attiva con --config
+  # configs/hpc/gate_v1_session.yaml; il gate v2 (stadio 56) lavora sempre per sessione.
+  bootstrap_unit: take
+  inner_cv_groups: take
   # CompareConfidence (M06): P(c1 = 1 | z) con regressione logistica, senza pesi di classe
   compare: {Cs: [0.001, 0.01, 0.1, 1.0, 10.0], inner_cv: 3}
