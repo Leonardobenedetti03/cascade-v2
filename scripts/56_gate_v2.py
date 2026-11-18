@@ -67,6 +67,10 @@ def check_config(g) -> None:
     for a, b in g.comparisons:
         if a not in g.scorers or b not in g.scorers:
             raise ValueError(f"confronto [{a}, {b}] con scorer non elencati in gate_v2.scorers")
+    if g.calibration_population not in ("all", "pretrain_unseen"):
+        raise ValueError(f"gate_v2.calibration_population sconosciuto: {g.calibration_population!r}")
+    if g.reliability_folds < 2:
+        raise ValueError("gate_v2.reliability_folds deve essere almeno 2")
     if min(g.outer_folds, g.inner_folds, g.gate_folds) < 2:
         raise ValueError("servono almeno 2 fold per livello")
 

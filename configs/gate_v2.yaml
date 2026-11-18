@@ -16,6 +16,9 @@ gate_v2:
   logreg_Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
   logreg_inner_cv: 3
   reliability_alpha: 1.0
+  reliability_folds: 5     # N38: affidabilità delle righe di fit fuori fold per sessione (correzione dell'errore 1)
+  calibration_population: all  # N38: all = come la run 772601; pretrain_unseen = configs/gate_v2_n38_cal.yaml
+  calibration_min_errors: 10
   calibration: platt      # platt | isotonic
   calibration_boot: 200   # bootstrap per sessione del calibratore (r_up)
   delta: 0.1              # r_up = quantile 90%; garanzia della regola a rischio al 90%

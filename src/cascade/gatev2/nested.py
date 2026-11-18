@@ -44,6 +44,30 @@ def outer_assignment(data: ScenarioData, gcfg, repeat: int) -> np.ndarray:
     return fold
 
 
+def calibration_rows(data: ScenarioData, tr0: np.ndarray, e_in: np.ndarray, gcfg, repeat: int, k: int):
+    """Maschera sulle righe ``tr0`` del train esterno per calibratore e soglie (N38) e popolazione usata.
+
+    Usa solo metadati del train (``camformer_pretrain``): la decisione sulle take valutate resta quella di
+    sempre, score -> rischio -> regola, senza metadati."""
+    pop = getattr(gcfg, "calibration_population", "all")
+    if pop == "all":
+        return np.ones(len(tr0), bool), "all"
+    if pop != "pretrain_unseen":
+        raise ValueError(f"gate_v2.calibration_population sconosciuto: {pop!r} (all | pretrain_unseen)")
+    m = data.takes.camformer_pretrain.astype(str).str.lower().to_numpy()[tr0] != "train"
+    n_err, n_sess = int(e_in[m].sum()), len(np.unique(data.sessions[tr0][m]))
+    if n_err < int(getattr(gcfg, "calibration_min_errors", 10)) or n_sess < 2:
+        log.warning(
+            "repeat %d fold %d: %d errori in %d sessioni non viste dal pre-addestramento: calibro su tutte",
+            repeat,
+            k,
+            n_err,
+            n_sess,
+        )
+        return np.ones(len(tr0), bool), "all_fallback"
+    return m, "pretrain_unseen"
+
+
 def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) -> Dict[str, object]:
     """Livelli 1–3 per la fold esterna k. Restituisce righe per take, soglie, log delle teste e importanze."""
     y, sess, C = data.y, data.sessions, len(data.classes)
@@ -120,6 +144,7 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
     }
     thresholds: List[dict] = []
     importance: List[dict] = []
+    cal_m, cal_pop = calibration_rows(data, tr0, e_in, gcfg, repeat, k)
     for name in gcfg.scorers:
         s_cf = np.zeros(len(tr0))
         for g in range(gcfg.gate_folds):
@@ -128,7 +153,9 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
                 P_in[fit_m], M_in[fit_m], y_in[fit_m], e_in[fit_m], s_in[fit_m], seed=_seed(repeat, k, 7, g)
             )
             s_cf[held] = sc.score(P_in[held], M_in[held])
-        cal = Calibrator(gcfg.calibration, gcfg.calibration_boot, gcfg.delta, _seed(repeat, k, 8)).fit(s_cf, e_in, s_in)
+        s_cal, e_cal = s_cf[cal_m], e_in[cal_m]  # calibratore e soglie: righe scelte da calibration_population
+        cal = Calibrator(gcfg.calibration, gcfg.calibration_boot, gcfg.delta, _seed(repeat, k, 8))
+        cal.fit(s_cal, e_cal, s_in[cal_m])
         final = make_scorer(name, gcfg, data.procedural).fit(P_in, M_in, y_in, e_in, s_in, seed=_seed(repeat, k, 9))
         s_te = np.full(len(te), np.nan)
         r_hat = np.full(len(te), np.nan)
@@ -137,19 +164,28 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
             s_te[pos0] = final.score(P_out[pos0], data.motion[te0])
             r_hat[pos0], r_up[pos0] = cal.predict(s_te[pos0])
         rows[f"s__{name}"], rows[f"rhat__{name}"], rows[f"rup__{name}"] = s_te, r_hat, r_up
-        base = {"repeat": repeat, "fold": k, "scorer": name, "n_cal": len(s_cf), "errors_cal": int(e_in.sum())}
+        base = {
+            "repeat": repeat,
+            "fold": k,
+            "scorer": name,
+            "n_cal": len(s_cal),
+            "errors_cal": int(e_cal.sum()),
+            "cal_population": cal_pop,
+        }
         if gcfg.calibration == "platt":
             base.update(platt_a=cal.params[0], platt_b=cal.params[1])
         for b in gcfg.betas:
             thresholds += [{**base, "rule": "cost", "param": b, "threshold": b}]
             thresholds += [{**base, "rule": "cost_hat", "param": b, "threshold": b}]
         for a in gcfg.alphas:
-            info = risk_threshold(s_cf, e_in, a, gcfg.delta, gcfg.risk_grid)
+            info = risk_threshold(s_cal, e_cal, a, gcfg.delta, gcfg.risk_grid)
             thresholds += [{**base, "rule": "risk", "param": a, **info}]
         for m in gcfg.max_error_rates:
-            thresholds += [{**base, "rule": "acc_target", "param": m, "threshold": acc_target_threshold(s_cf, e_in, m)}]
+            thresholds += [
+                {**base, "rule": "acc_target", "param": m, "threshold": acc_target_threshold(s_cal, e_cal, m)}
+            ]
         for rho in gcfg.budgets:
-            thresholds += [{**base, "rule": "budget", "param": rho, "threshold": budget_threshold(s_cf, rho)}]
+            thresholds += [{**base, "rule": "budget", "param": rho, "threshold": budget_threshold(s_cal, rho)}]
         importance += [
             {"repeat": repeat, "fold": k, "scorer": name, "feature": f, "importance": v}
             for f, v in final.importance().items()

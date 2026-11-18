@@ -3,8 +3,14 @@
 Feature (solo da CamFormer e dalla traiettoria):
 - ``A``: logit di p_max (troncato), margine top-1 − top-2, entropia normalizzata;
 - ``B``: affidabilità della classe predetta (quota di predizioni corrette di CamFormer per quella classe, con
-  smoothing (k + α)/(n + 2α)) e flag "top-1 e top-2 entrambe procedurali". L'affidabilità si stima sulle righe
-  di fit; per una riga di fit esclude la sua sessione (nessuna riga vede la propria etichetta);
+  smoothing (k + α)/(n + 2α)) e flag "top-1 e top-2 entrambe procedurali". L'affidabilità di una riga nuova si
+  stima su tutte le righe di fit. Quella di una riga di fit è FUORI FOLD (N38): le righe di fit si dividono in K
+  fold per sessione (stratificate per classe predetta) e ogni fold riceve l'affidabilità calcolata sulle altre;
+  l'esito di una riga pesa per circa 1/(take della fold) sul suo valore, come nel gate v1 che escludeva la fold.
+  La versione della run del 18/11 (job 772601) escludeva la sola sessione della riga: dentro il training set il
+  valore, (corrette − corrette della sessione)/(predette − predette della sessione), era una funzione decrescente
+  degli esiti della sessione; con sessioni di una take (la mediana) è un leave-one-out esatto. Correlazione con
+  l'errore dentro classe 0,6–0,95 sui dati reali: LightGBM imparava una regola rovesciata;
 - ``C``: moto della camera (``motion.MOTION_FEATURES``), imputato con la mediana del fit.
 
 Scorer:
@@ -23,6 +29,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
+from src.cascade.gatev2.folds import session_folds
 from src.cascade.motion import MOTION_FEATURES
 
 log = logging.getLogger(__name__)
@@ -44,43 +51,50 @@ def group_a(P: np.ndarray) -> np.ndarray:
 
 
 class FeatureBuilder:
-    """Costruisce le feature; ``fit`` memorizza i conteggi di affidabilità delle righe di fit."""
+    """Costruisce le feature; ``fit`` memorizza i conteggi di affidabilità delle righe di fit e, per le righe di
+    fit stesse, l'affidabilità fuori fold (``train_reliability``)."""
 
-    def __init__(self, groups: List[str], procedural: np.ndarray, alpha: float = 1.0) -> None:
+    def __init__(self, groups: List[str], procedural: np.ndarray, alpha: float = 1.0, n_folds: int = 5) -> None:
         bad = set(groups) - {"A", "B", "C"}
         if bad:
             raise ValueError(f"gruppi sconosciuti: {sorted(bad)}")
         self.groups, self.proc, self.alpha = list(groups), np.asarray(procedural, bool), float(alpha)
+        self.n_folds = int(n_folds)
         self.n_pred = self.n_corr = None
-        self.by_session: Dict[str, tuple] = {}
+        self.train_reliability: Optional[np.ndarray] = None
 
-    def fit(self, P: np.ndarray, y: np.ndarray, sessions: np.ndarray) -> FeatureBuilder:
+    def _rate(self, n: np.ndarray, k: np.ndarray) -> np.ndarray:
+        return (k + self.alpha) / (n + 2 * self.alpha)
+
+    def fit(self, P: np.ndarray, y: np.ndarray, sessions: np.ndarray, seed: int = 0) -> FeatureBuilder:
         C = P.shape[1]
         pred, corr = P.argmax(1), (P.argmax(1) == y).astype(float)
         self.n_pred = np.bincount(pred, minlength=C).astype(float)
         self.n_corr = np.bincount(pred, weights=corr, minlength=C)
-        self.by_session = {}
-        for s in np.unique(np.asarray(sessions).astype(str)):
-            m = np.asarray(sessions).astype(str) == s
-            self.by_session[s] = (
-                np.bincount(pred[m], minlength=C).astype(float),
-                np.bincount(pred[m], weights=corr[m], minlength=C),
-            )
+        self.train_reliability = None
+        if "B" in self.groups:
+            s = np.asarray(sessions).astype(str)
+            k = min(self.n_folds, len(np.unique(s)))
+            rel = np.full(len(P), self._rate(np.zeros(1), np.zeros(1))[0])  # una sola sessione: solo il prior
+            if k >= 2:
+                fold = session_folds(pred, s, k, seed)  # stratificate per classe PREDETTA: non dipendono dalle label
+                for j in range(k):
+                    m = fold == j
+                    n_out = self.n_pred - np.bincount(pred[m], minlength=C)
+                    k_out = self.n_corr - np.bincount(pred[m], weights=corr[m], minlength=C)
+                    rel[m] = self._rate(n_out, k_out)[pred[m]]
+            else:
+                log.warning("affidabilità fuori fold: una sola sessione nel fit, uso il solo prior")
+            self.train_reliability = rel
         return self
 
-    def reliability(self, P: np.ndarray, sessions: Optional[np.ndarray] = None) -> np.ndarray:
-        """Con ``sessions`` (righe di fit) si toglie la propria sessione dai conteggi."""
+    def reliability(self, P: np.ndarray) -> np.ndarray:
+        """Affidabilità per righe NUOVE: conteggi di tutte le righe di fit."""
         pred = P.argmax(1)
-        n, k = self.n_pred[pred].copy(), self.n_corr[pred].copy()
-        if sessions is not None:
-            for i, s in enumerate(np.asarray(sessions).astype(str)):
-                if s in self.by_session:
-                    sn, sk = self.by_session[s]
-                    n[i] -= sn[pred[i]]
-                    k[i] -= sk[pred[i]]
-        return (k + self.alpha) / (n + 2 * self.alpha)
+        return self._rate(self.n_pred[pred], self.n_corr[pred])
 
-    def transform(self, P: np.ndarray, M: np.ndarray, own_sessions: Optional[np.ndarray] = None) -> np.ndarray:
+    def transform(self, P: np.ndarray, M: np.ndarray, training: bool = False) -> np.ndarray:
+        """``training=True`` solo per le stesse righe passate a ``fit``: affidabilità fuori fold."""
         mats = []
         for g in self.groups:
             if g == "A":
@@ -90,7 +104,13 @@ class FeatureBuilder:
                     raise RuntimeError("FeatureBuilder.fit prima di transform con il gruppo B")
                 top2 = np.argsort(-P, axis=1, kind="stable")[:, :2]
                 flag = (self.proc[top2[:, 0]] & self.proc[top2[:, 1]]).astype(float)
-                mats.append(np.stack([self.reliability(P, own_sessions), flag], 1))
+                if training:
+                    if self.train_reliability is None or len(self.train_reliability) != len(P):
+                        raise RuntimeError("transform(training=True) vuole le stesse righe di fit")
+                    rel = self.train_reliability
+                else:
+                    rel = self.reliability(P)
+                mats.append(np.stack([rel, flag], 1))
             elif g == "C":
                 mats.append(np.asarray(M, float))
         return np.concatenate(mats, 1) if mats else np.zeros((len(P), 0))
@@ -170,8 +190,8 @@ class LogRegScorer(Scorer):
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
 
-        self.fb.fit(P, y, sessions)
-        X = self.fb.transform(P, M, own_sessions=sessions)
+        self.fb.fit(P, y, sessions, seed=seed)
+        X = self.fb.transform(P, M, training=True)
         cv = session_cv(e, sessions, self.inner_cv, seed)
         if cv is None:
             self.constant = float(np.mean(e))
@@ -213,8 +233,8 @@ class LGBMScorer(Scorer):
     def fit(self, P, M, y, e, sessions, seed: int = 0) -> LGBMScorer:
         import lightgbm as lgb
 
-        self.fb.fit(P, y, sessions)
-        X = self.fb.transform(P, M, own_sessions=sessions)
+        self.fb.fit(P, y, sessions, seed=seed)
+        X = self.fb.transform(P, M, training=True)
         cv = session_cv(e, sessions, max(2, int(round(1.0 / self.valid_frac))), seed)
         if cv is None or e.sum() < 4:
             self.constant = float(np.mean(e))
@@ -253,6 +273,12 @@ def _groups(suffix: str) -> List[str]:
 
 
 def make_scorer(name: str, gcfg, procedural: np.ndarray) -> Scorer:
+    sc = _make_scorer(name, gcfg, procedural)
+    sc.fb.n_folds = int(getattr(gcfg, "reliability_folds", 5))  # fold dell'affidabilità fuori fold (N38)
+    return sc
+
+
+def _make_scorer(name: str, gcfg, procedural: np.ndarray) -> Scorer:
     a = gcfg.reliability_alpha
     if name == "thr_maxprob":
         return MaxProbScorer(procedural, a)

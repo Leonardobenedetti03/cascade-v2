@@ -1,0 +1,8 @@
+# N38, run correttiva 1 di 2: SOLO la correzione dell'affidabilità (fuori fold per sessione, nel codice).
+# Tutto il resto è la config della run del 18/11 (job 772601): stessi fold, ripetizioni, teste, regole e sottoinsiemi.
+# Quella run differiva da configs/gate_v2.yaml in due voci, riportate qui: β fino a 0,20 e lgbm_ABC tra gli scorer.
+#   python scripts/56_gate_v2.py --run-name gate_v2 --scenario-run DIR --tag n38_rel --config configs/gate_v2_n38_rel.yaml
+gate_v2:
+  betas: [0.01, 0.02, 0.05, 0.10, 0.20]
+  scorers: [thr_maxprob, logreg_A, logreg_AC, logreg_ABC, lgbm_ABC, class_rule]
+  calibration_population: all

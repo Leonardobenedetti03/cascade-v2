@@ -26,7 +26,8 @@ durante la ricostruzione che il blueprint non prevedeva o prevedeva in modo dive
 | M16 | `results/` nel repository | Risultati solo sull'HPC e in un backup | Ogni numero del report ha run e commit | previsto dopo le run |
 | M17 | CamFormer dal checkpoint del paper, encoder congelato, si allena solo la testa; EgoVLP invariato (congelato, testa logistica) | v1: checkpoint con fine-tuning end-to-end; blueprint (M04): da zero | Decisione del gruppo (16/11): modelli pre-addestrati su molti più dati, si addestrano solo i classificatori. Limiti dichiarati in N24 | previsto (C14d) |
 | M18 | L0 e L1 da `scenario_preds` (teste logistiche su CamFormer ed EgoVLP congelati, 6 classi, 3 seed), cache del gate dallo stadio 44 al posto di 00–45; divisione ufficiale con la val tagliata a metà (val/test) | Stadi 00–45 di cascade-v2, divisione per sito (M02/M03) | Il controllo su L0 della run `site_v2` è fallito (siti mai visti per CamFormer congelato); la divisione per sito resta analisi secondaria. Dettagli in N28–N31 | previsto (C15) |
-| M19 | Valutazione aggiuntiva in CV annidata per sessione su tutte le 1271 take (stadio 56, gate v2): teste, gate, calibratore e soglie rifatti dentro ogni fold; regole a costo e a rischio garantito; opzioni per sessione nel gate v1 | Una sola divisione val/test; punto di lavoro su 143 take, al bordo | Analisi di Giorgio del 18/11. Si aggiunge, non sostituisce: N33 e N34 restano la prima valutazione. Dettagli in N37 | previsto (C22) |
+| M19 | Valutazione aggiuntiva in CV annidata per sessione su tutte le 1271 take (stadio 56, gate v2): teste, gate, calibratore e soglie rifatti dentro ogni fold; regole a costo e a rischio garantito; opzioni per sessione nel gate v1 | Una sola divisione val/test; punto di lavoro su 143 take, al bordo | Analisi di Giorgio del 18/11. Si aggiunge, non sostituisce: N33 e N34 restano la prima valutazione. Dettagli in N37 | fatto (C22, run 772601, risultati C23, N38) |
+| M20 | Gate v2, correzioni trovate dopo la run 772601: (1) affidabilità della classe predetta delle righe di fit fuori fold per sessione (`reliability_folds`); (2) opzione `calibration_population` (calibratore e soglie anche solo sulle take del train non viste dal pre-addestramento di CamFormer); `TAG` e `CONFIG` negli script HPC | (1) affidabilità che escludeva la sola sessione; (2) calibrazione su tutto il train | (1) leave-one-out target encoding, LightGBM con regola rovesciata; (2) rischio sottostimato sulle non viste, garanzia che non regge (N38). Run correttive `n38_rel` e `n38_cal` accanto alla pre-registrata. Dettagli in N38, N39 | previsto (C24) |
 
 ## Note di lavorazione
 
@@ -591,3 +592,78 @@ risultati di N33 e N34 restano riportati come "prima valutazione".
   CV, pesi bootstrap per sessione, IC più larghi con sessioni omogenee). Suite: 307 passati, 10 saltati; i 5 test che
   richiedono `torch`/`av` (stadi 10 e 44) non girano nella sandbox, la catena 44 → 50 `--final` → 53 è stata
   provata a mano con lo stadio 40 simulato.
+
+**N38 — Risultati della CV annidata (run 772601) e due errori trovati dopo la run (18/11, sera).** Job SLURM
+772601 (codice C22 96e391e), 2 h 39 min, COMPLETED; output in `results/scenario_cv/` (C23 e0cc174), controllati
+byte per byte contro l'archivio del cluster. Questi risultati sono quelli pre-registrati (N37) e non si
+sovrascrivono: il manifest dello stadio 56 dà errore se nello stesso tag la config cambia. Le correzioni si valutano
+in tag nuovi (N39), riportati accanto.
+- Conteggi: 1271 take, 294 sessioni (mediana 1 take per sessione), 0 take senza CamFormer, EgoVLP o moto. CamFormer
+  fuori campione 0,924 (tutte), 0,882 (337 non viste dal pre-addestramento); EgoVLP 0,999 (4 errori, tutti in
+  `upenn_0720_Dance_3`, in una sola ripetizione).
+- **Risultato principale (pre-registrato)**, non viste, `thr_maxprob`, costo β = 0,05: accuratezza 0,995
+  [0,984; 1,000], quota a EgoVLP 34,4% [25,8; 46,6], 159,7 contro 462,2 GMACs per take = 34,6% di solo EgoVLP
+  (2,9 volte meno). Tutte le take: 0,997 al 29,7%. Oracolo 11,8% (non viste), 7,7% (tutte).
+- Curva su β (non viste, `thr_maxprob`): accuratezza 1,000 / 0,998 / 0,995 / 0,985 / 0,980 con il 47,1 / 41,4 /
+  34,6 / 27,6 / 21,1% del calcolo di solo EgoVLP (β = 0,01 / 0,02 / 0,05 / 0,10 / 0,20).
+- Stessa regola della v1 (`acc_target` 0,01): tutte 0,990 al 19,0%; non viste 0,985 al 23,5%, cioè oltre la
+  tolleranza di 1 punto (v1, test: 1,000 al 28,3%).
+- Confronti pre-registrati (non viste, Holm): `logreg_A` = `thr_maxprob` (AUROC 0,921 contro 0,921; quota −0,8 punti,
+  p = 0,048); RQ2 nulla (`logreg_AC` − `logreg_A`: AUROC −0,002, p = 1; quota −1,6 punti, p = 0,22); `logreg_ABC` =
+  `logreg_AC`; `thr_maxprob` batte la regola per classe in AUROC (0,92 contro 0,80, p < 0,001), non in accuratezza e
+  quota dopo Holm.
+- Garanzia della regola a rischio (`thr_maxprob`, errore delle take lasciate a CamFormer ≤ α nella fold esterna):
+  su tutte le take 15/15 fold per α = 0,02 e 0,05, 13/15 per α = 0,10; **sulle non viste 12/15, 9/15 e 7/15**: sul
+  sottoinsieme principale la garanzia non regge (errore 2).
+- **Errore 1 (codice): affidabilità della classe predetta (gruppo B).** Per le righe di addestramento dei gate,
+  `FeatureBuilder.reliability` escludeva la sola sessione della riga. Dentro il training set il valore,
+  (corrette − corrette della sessione)/(predette − predette della sessione), è una funzione decrescente degli esiti
+  della sessione; con sessioni di una take (la mediana) è un leave-one-out target encoding esatto. Sui dati reali la
+  correlazione dentro classe con l'errore è 0,74 / 0,60 / 0,84 / 0,95 / 0,93 / 0,82 (analisi di Giorgio, ricalcolata
+  in modo indipendente con gli stessi numeri); LightGBM impara una regola rovesciata (`lgbm_ABC` AUROC 0,738 tutte,
+  0,695 non viste). La valutazione resta pulita (nessuna take valutata nei fit): l'effetto è un peggioramento, non un
+  ottimismo. Il test "cambiare l'esito della sola riga non ne cambia il valore" non trova l'errore (il cambiamento
+  entra nel totale e nella sessione e si annulla); il test giusto è la correlazione con l'errore dentro classe.
+  Correzione (`gatev2/scorers.py`, Giorgio): per le righe di fit l'affidabilità è FUORI FOLD, con
+  `reliability_folds` (5) fold per sessione stratificate per classe predetta, come nel gate v1 che escludeva la fold;
+  per le righe nuove resta calcolata su tutte le righe di fit. Prova sul train di official_v2 (986 take, CV per
+  sessione 5 × 3): LightGBM A 0,911–0,925, A + B vecchia 0,835, A + B corretta 0,932–0,940; logistica circa 0,94 in
+  tutti i casi. Valutata e scartata la variante "classe predetta in one-hot" (nessuna fuga per costruzione, AUROC
+  equivalente): si tiene la fuori fold per coerenza con il gate v1. Prova A/B sulla run finta: fra le colonne per
+  take cambiano solo quelle di `logreg_ABC` (e `lgbm_ABC`), tutte le altre identiche bit per bit.
+- **Errore 2 (metodo): calibrazione sulle take non viste.** Calibratore e soglie si stimano sul train esterno, in cui
+  circa il 73% delle take è stato visto dal pre-addestramento di CamFormer (L0 0,94 contro 0,88 sulle non viste).
+  Sulle 337 non viste il rischio è sottostimato (previsto 9,3%, osservato 11,8%; fasce intermedie 3,1% contro 8,9% e
+  28% contro 40%): `acc_target` dà 0,985 e la garanzia di `risk` regge in 9 fold su 15 con α = 0,05. Nuova opzione
+  `gate_v2.calibration_population` (`all` = come la run 772601, default invariato; `pretrain_unseen` = calibratore e
+  soglie di `risk`, `acc_target`, `budget` stimati solo sulle take del train esterno non viste dal pre-addestramento;
+  lo scorer si addestra sempre su tutte). Con meno di `calibration_min_errors` (10) errori fra quelle righe si torna a
+  tutte, con colonna `cal_population` = `all_fallback` in `thresholds.csv`. Usa solo metadati del train: la decisione
+  sulle take valutate non cambia forma.
+- Limiti aggiunti: gli intervalli bootstrap per sessione non includono la variabilità del riaddestramento (Bates,
+  Hastie e Tibshirani, 2023); la testa di EgoVLP sceglie C = 100 (bordo della griglia) in 11 fold su 15 e T fino a
+  0,05 (bordo): probabilità di EgoVLP sature, innocue per il gate che ne usa solo la classe; le take di val e test
+  ufficiali sono nella lista di validazione del pre-addestramento di CamFormer [DA VERIFICARE se usata per il
+  checkpoint].
+- Ritirato: "il vantaggio di LightGBM della v1 non si conferma" (`lgbm_ABC` della run 772601 non è valutabile).
+
+**N39 — Pre-registrazione delle run correttive (18/11, sera, prima delle run).** Codice C24; stessa run di
+`scenario_preds` (`official_v2`), stesso `RUN_NAME=gate_v2`, tag nuovi accanto a `main` (la run 772601).
+- `TAG=n38_rel CONFIG=configs/gate_v2_n38_rel.yaml`: SOLO la correzione dell'errore 1 (`calibration_population: all`).
+- `TAG=n38_cal CONFIG=configs/gate_v2_n38_cal.yaml`: errori 1 e 2 (`calibration_population: pretrain_unseen`).
+- Tutto il resto identico alla run 772601: config N37 (β fino a 0,20, `lgbm_ABC` tra gli scorer, già default in
+  `configs/gate_v2.yaml`), semi, partizioni, teste, regole, sottoinsiemi, confronti. `N_JOBS` può cambiare (solo
+  parallelismo).
+- **Controlli pre-registrati:** in `n38_rel` i gate che non usano B (`thr_maxprob`, `logreg_A`, `logreg_AC`,
+  `class_rule`) e i riferimenti devono dare numeri identici alla run 772601 (`metrics.csv`, `auc.csv`,
+  `cost_vs_egovlp.csv`); se no, i risultati delle run correttive non si usano. In `n38_cal` gli score
+  (`s__*` in `takes.csv.gz`) devono essere identici a `n38_rel`; cambiano solo calibrazione e soglie. Si riporta
+  quante fold ricadono su `all_fallback`.
+- Da riportare: prima i risultati pre-registrati (N38); poi `n38_rel` (LightGBM valutabile) e `n38_cal` (calibrazione
+  sulle non viste), dichiarati come correzioni successive alla run. Non si sceglie a posteriori la versione
+  "migliore": il β principale resta 0,05 e il risultato principale resta su `pretrain_unseen`.
+- Test (`tests/test_gatev2.py`, Giorgio): affidabilità fuori fold calcolata correttamente; correlazione dentro classe
+  con l'errore < 0,3 con sessioni da 1 e da 6 take (il codice della run 772601 dà +1,00 e +0,62); calibrazione solo
+  sulle non viste e ritorno a tutte con pochi errori; default `all` invariato; popolazione sconosciuta rifiutata;
+  config n38 uguali alla run 772601 salvo `calibration_population`.
+

@@ -279,7 +279,14 @@ class GateV2Cfg:
     logreg_inner_cv: int = 3
     lgbm: Dict[str, Any] = field(default_factory=dict)
     reliability_alpha: float = 1.0
+    reliability_folds: int = 5  # N38: affidabilità delle righe di fit fuori fold (fold per sessione)
     calibration: str = "platt"  # platt | isotonic
+    # N38: righe del train esterno su cui si stimano calibratore e soglie (risk, acc_target, budget). all = come la
+    # run del 18/11; pretrain_unseen = solo le take non viste dal pre-addestramento di CamFormer (in uso reale ogni
+    # take è nuova per CamFormer). Lo scorer si addestra sempre su tutte le righe. Con meno di
+    # calibration_min_errors errori fra quelle righe si torna a all, con avviso e colonna cal_population.
+    calibration_population: str = "all"
+    calibration_min_errors: int = 10
     calibration_boot: int = 200  # repliche bootstrap per sessione del calibratore (r_up)
     delta: float = 0.1  # r_up = quantile 1 − δ; livello della garanzia della regola a rischio
     betas: List[float] = field(default_factory=lambda: [0.01, 0.02, 0.05, 0.10, 0.20])

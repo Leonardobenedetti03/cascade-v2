@@ -174,16 +174,43 @@ def test_session_folds_never_split_a_session():
         session_folds(y[:10], sess[:10], 5, 0)  # 2 sessioni per 5 fold
 
 
-def test_reliability_excludes_own_session():
-    P = np.tile(np.eye(6)[3], (6, 1)) * 0.9 + 0.1 / 6  # tutte predette Cooking
-    y = np.array([3, 3, 3, 0, 0, 0])  # la sessione A ha sempre ragione, la B mai
-    sess = np.array(["A", "A", "A", "B", "B", "B"])
-    fb = FeatureBuilder(["A", "B"], PROC, alpha=1.0).fit(P, y, sess)
-    own = fb.reliability(P, sess)
-    assert own[0] == pytest.approx((0 + 1) / (3 + 2))  # per A conta solo B (0 corrette su 3)
-    assert own[3] == pytest.approx((3 + 1) / (3 + 2))  # per B conta solo A
-    assert fb.reliability(P)[0] == pytest.approx((3 + 1) / (6 + 2))  # righe nuove: tutte le righe di fit
-    assert fb.transform(P, np.zeros((6, 9)), sess).shape == (6, 5)
+def test_training_reliability_is_out_of_fold():
+    """N38: ogni riga di fit riceve l'affidabilità calcolata sulle ALTRE fold (fold per sessione, stratificate per
+    classe predetta); le righe nuove usano tutte le righe di fit."""
+    from src.cascade.gatev2.folds import session_folds
+
+    rng = np.random.default_rng(0)
+    sess = np.repeat([f"s{i}" for i in range(40)], 5)
+    P = rng.dirichlet(np.ones(6) * 0.5, size=len(sess))
+    pred = P.argmax(1)
+    y = np.where(rng.random(len(P)) < 0.7, pred, (pred + 1) % 6)
+    corr = (pred == y).astype(float)
+    fb = FeatureBuilder(["A", "B"], PROC, alpha=1.0, n_folds=5).fit(P, y, sess, seed=3)
+    fold = session_folds(pred, sess, 5, 3)
+    for j in range(5):
+        out = fold != j
+        for c in np.unique(pred[fold == j]):
+            n, k = (pred[out] == c).sum(), corr[out][pred[out] == c].sum()
+            assert np.allclose(fb.train_reliability[(fold == j) & (pred == c)], (k + 1) / (n + 2))
+    k, n = corr[pred == 3].sum(), (pred == 3).sum()
+    assert fb.reliability(np.eye(6)[[3]])[0] == pytest.approx((k + 1) / (n + 2))
+    assert fb.transform(P, np.zeros((len(P), 9)), training=True).shape == (len(P), 5)
+    with pytest.raises(RuntimeError):
+        fb.transform(P[:10], np.zeros((10, 9)), training=True)
+
+
+@pytest.mark.parametrize("per_session", [1, 6])
+def test_training_reliability_is_not_correlated_with_own_error(per_session):
+    """Il difetto della run del 18/11: escludendo la sola sessione, dentro un training set il valore di una riga è una
+    funzione decrescente degli esiti della sua sessione (con sessioni di una take, la mediana dei dati, è un
+    leave-one-out esatto: correlazione +1,00 con l'errore; +0,62 con 6 take). Fuori fold resta piccola."""
+    rng = np.random.default_rng(1)
+    sess = np.repeat([f"s{i}" for i in range(60)], per_session)
+    P = np.tile(np.eye(6)[3] * 0.8 + 0.2 / 6, (len(sess), 1))  # tutte predette Cooking
+    err_rate = np.repeat(rng.uniform(0, 0.8, 60), per_session)
+    y = np.where(rng.random(len(sess)) < err_rate, 0, 3)
+    r = FeatureBuilder(["A", "B"], PROC).fit(P, y, sess, seed=0).train_reliability
+    assert abs(np.corrcoef(r, (y != 3).astype(float))[0, 1]) < 0.3
 
 
 def test_scorers_direction_and_unknown_names():
@@ -372,3 +399,61 @@ def test_v1_session_bootstrap_is_wider_with_clustered_sessions():
     sd_take = (resample_weights(200, 500, 1) @ x / 200).std()
     sd_sess = (group_resample_weights(groups, 500, 1) @ x / 200).std()
     assert sd_sess > 2 * sd_take
+
+
+# --------------------------------------------------------------------------- N38: calibrazione sulle non viste
+def test_calibration_population_uses_only_unseen_training_rows(tmp_path):
+    from src.cascade.gatev2 import nested
+    from src.cascade.gatev2.data import load_scenario_run
+
+    data = load_scenario_run(fake_scenario_run(tmp_path / "scen"), NAMES, PROC, motion=False)
+    g = _gcfg(
+        "gate_v2.scorers=[thr_maxprob]",
+        "gate_v2.comparisons=[]",
+        "gate_v2.calibration_population=pretrain_unseen",
+        "gate_v2.calibration_min_errors=1",
+    )
+    fold = nested.outer_assignment(data, g, 0)
+    unseen = data.takes.camformer_pretrain.to_numpy() != "train"
+    for k in range(g.outer_folds):
+        th = pd.DataFrame(nested.run_fold(data, g, 0, k, fold)["thresholds"])
+        tr0 = (fold != k) & data.has_l0
+        assert set(th.cal_population) == {"pretrain_unseen"}
+        assert (th.n_cal == int((tr0 & unseen).sum())).all()
+    g.calibration_min_errors = 10**6  # troppo pochi errori: si torna a tutte le righe, dichiarandolo
+    th = pd.DataFrame(nested.run_fold(data, g, 0, 0, fold)["thresholds"])
+    assert set(th.cal_population) == {"all_fallback"}
+    assert (th.n_cal == int(((fold != 0) & data.has_l0).sum())).all()
+
+
+def test_default_calibration_population_is_unchanged(tmp_path):
+    from src.cascade.gatev2 import nested
+    from src.cascade.gatev2.data import load_scenario_run
+
+    data = load_scenario_run(fake_scenario_run(tmp_path / "scen"), NAMES, PROC, motion=False)
+    g = _gcfg("gate_v2.scorers=[thr_maxprob]", "gate_v2.comparisons=[]")
+    assert g.calibration_population == "all"
+    fold = nested.outer_assignment(data, g, 0)
+    th = pd.DataFrame(nested.run_fold(data, g, 0, 0, fold)["thresholds"])
+    assert set(th.cal_population) == {"all"} and (th.n_cal == int(((fold != 0) & data.has_l0).sum())).all()
+
+
+def test_stage_56_rejects_unknown_calibration_population(env):
+    rd, scen = env
+    with pytest.raises(ValueError, match="calibration_population"):
+        _script("56_gate_v2.py").main(_argv(scen, "--set", "gate_v2.calibration_population=val"))
+
+
+def test_n38_configs_reproduce_the_18_11_run_except_the_corrections():
+    """Le config della run correttiva cambiano solo calibration_population rispetto alla run del 18/11."""
+    import yaml
+
+    base = load_config([]).gate_v2
+    for name, pop in (("gate_v2_n38_rel.yaml", "all"), ("gate_v2_n38_cal.yaml", "pretrain_unseen")):
+        g = load_config([ROOT / "configs" / name]).gate_v2
+        raw = yaml.safe_load((ROOT / "configs" / name).read_text())["gate_v2"]
+        assert set(raw) == {"betas", "scorers", "calibration_population"}
+        assert g.betas == [0.01, 0.02, 0.05, 0.10, 0.20] and "lgbm_ABC" in g.scorers
+        assert g.calibration_population == pop
+        for f in ("outer_folds", "inner_folds", "gate_folds", "repeats", "primary_rule", "primary_param", "subsets"):
+            assert getattr(g, f) == getattr(base, f)
