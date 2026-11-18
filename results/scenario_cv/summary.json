@@ -1,0 +1,106 @@
+{
+  "cost_vs_egovlp_primary": {
+    "subset": "pretrain_unseen",
+    "system": "thr_maxprob",
+    "rule": "cost",
+    "param": 0.05,
+    "primary_beta": true,
+    "acc": 0.9950544015825914,
+    "acc_minus_egovlp": -0.004945598417408603,
+    "rho": 0.34421364985163205,
+    "gmacs_per_take_cascade": 159.6873269287834,
+    "gmacs_per_take_cascade_ci_low": 119.67363367475187,
+    "gmacs_per_take_cascade_ci_high": 215.73611087806935,
+    "gmacs_per_take_egovlp_only": 462.15248,
+    "cost_frac_of_egovlp_only": 0.345529525079652,
+    "cost_frac_ci_low": 0.2589483749492199,
+    "cost_frac_ci_high": 0.46680721236867395,
+    "saving_frac": 0.654470474920348,
+    "speedup": 2.8941086865716565,
+    "gmacs_total_cascade": 53814.629175,
+    "gmacs_total_egovlp_only": 155745.38576,
+    "n_takes": 337
+  },
+  "primary": {
+    "subset": "pretrain_unseen",
+    "scorer": "thr_maxprob",
+    "rule": "cost",
+    "param": 0.05,
+    "system": "thr_maxprob",
+    "n_takes": 337,
+    "n_sessions": 108,
+    "acc": 0.9950544015825914,
+    "acc_ci_low": 0.9837014711107268,
+    "acc_ci_high": 1.0,
+    "acc_sd_repeats": 0.002797652942380002,
+    "bacc": 0.9894029581529581,
+    "rho": 0.34421364985163205,
+    "rho_ci_low": 0.25763249972119995,
+    "rho_ci_high": 0.465491337140654,
+    "rho_sd_repeats": 0.0024228385190733642,
+    "camera_off": 0.655786350148368,
+    "cost_frac_L1": 0.34507544884471936,
+    "errors_left": 1.6666666666666665,
+    "selective_error": 0.007541478129713423,
+    "selective_error_ci_high": 0.02718551722115224,
+    "acc_minus_L1": -0.004945598417408603,
+    "acc_minus_L1_ci_low": -0.016298528889273182,
+    "acc_minus_L1_ci_high": 0.0,
+    "acc_L0_kept": 0.9924585218702867
+  },
+  "models": [
+    {
+      "subset": "all",
+      "n_takes": 1271,
+      "acc_L0": 0.9244689221085759,
+      "errors_L0": 96.0,
+      "acc_L1": 0.998950957251508,
+      "errors_L1": 1.3333333333333333,
+      "n_no_l0": 0
+    },
+    {
+      "subset": "pretrain_unseen",
+      "n_takes": 337,
+      "acc_L0": 0.8822947576656776,
+      "errors_L0": 39.666666666666664,
+      "acc_L1": 1.0,
+      "errors_L1": 0.0,
+      "n_no_l0": 0
+    },
+    {
+      "subset": "pretrain_seen",
+      "n_takes": 934,
+      "acc_L0": 0.9396859386152748,
+      "errors_L0": 56.333333333333336,
+      "acc_L1": 0.9985724482512491,
+      "errors_L1": 1.3333333333333333,
+      "n_no_l0": 0
+    },
+    {
+      "subset": "official_eval",
+      "n_takes": 285,
+      "acc_L0": 0.9146198830409356,
+      "errors_L0": 24.333333333333332,
+      "acc_L1": 1.0,
+      "errors_L1": 0.0,
+      "n_no_l0": 0
+    }
+  ],
+  "l1_always_correct": false,
+  "counts": {
+    "n_index": 1273,
+    "n_out_of_head": 2,
+    "n_no_l1": 0,
+    "n_no_l0": 0,
+    "n_takes": 1271,
+    "n_sessions": 294,
+    "n_no_motion": 0
+  },
+  "n_windows": 5,
+  "scenario_run": "/mnt/beegfsstudents/home/3195149/scenario_runs/official_v2",
+  "repeats": [
+    0,
+    1,
+    2
+  ]
+}
