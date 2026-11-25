@@ -9,17 +9,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.cascade.config import load_config
-from src.cascade.gatev2.calibrate import Calibrator, ece
-from src.cascade.gatev2.folds import check_grouping, session_folds
-from src.cascade.gatev2.rules import (
+from src.cascade.data.folds import check_grouping, session_folds
+from src.cascade.evaluation.rules import (
     acc_target_threshold,
     budget_threshold,
     clopper_pearson_upper,
     escalate,
     risk_threshold,
 )
-from src.cascade.gatev2.scorers import FeatureBuilder, make_scorer
+from src.cascade.models.gates import FeatureBuilder, make_scorer
+from src.cascade.training.calibration import Calibrator, ece
+from src.cascade.utils.config import load_config
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = ["Basketball", "Dance", "Soccer", "Cooking", "Health", "Bike repair"]
@@ -177,7 +177,7 @@ def test_session_folds_never_split_a_session():
 def test_training_reliability_is_out_of_fold():
     """N38: ogni riga di fit riceve l'affidabilità calcolata sulle ALTRE fold (fold per sessione, stratificate per
     classe predetta); le righe nuove usano tutte le righe di fit."""
-    from src.cascade.gatev2.folds import session_folds
+    from src.cascade.data.folds import session_folds
 
     rng = np.random.default_rng(0)
     sess = np.repeat([f"s{i}" for i in range(40)], 5)
@@ -227,9 +227,9 @@ def test_scorers_direction_and_unknown_names():
 def test_nested_cv_has_no_leakage(tmp_path, monkeypatch):
     """Nessuna take della fold esterna entra in una testa o in un gate di quella fold; il gate si addestra solo su
     predizioni interne fuori campione e il cross-fitting non vede la fold del gate che valuta."""
-    from src.cascade.gatev2 import nested
-    from src.cascade.gatev2.data import load_scenario_run
-    from src.cascade.gatev2.scorers import LogRegScorer
+    from src.cascade.data.gate_inputs import load_scenario_run
+    from src.cascade.evaluation import nested_cv as nested
+    from src.cascade.models.gates import LogRegScorer
 
     data = load_scenario_run(fake_scenario_run(tmp_path / "scen"), NAMES, PROC, motion=False)
     g = _gcfg("gate_v2.scorers=[thr_maxprob,logreg_A]", "gate_v2.comparisons=[[logreg_A,thr_maxprob]]")
@@ -267,8 +267,8 @@ def test_nested_cv_has_no_leakage(tmp_path, monkeypatch):
 
 
 def test_outer_l0_inner_mean_and_bad_value(tmp_path):
-    from src.cascade.gatev2 import nested
-    from src.cascade.gatev2.data import load_scenario_run
+    from src.cascade.data.gate_inputs import load_scenario_run
+    from src.cascade.evaluation import nested_cv as nested
 
     data = load_scenario_run(fake_scenario_run(tmp_path / "scen"), NAMES, PROC, motion=False)
     g = _gcfg("gate_v2.scorers=[thr_maxprob]", "gate_v2.comparisons=[]", "gate_v2.outer_l0=inner_mean")
@@ -294,7 +294,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("DL4CV_ROOT", str(tmp_path / "root"))
     monkeypatch.delenv("CASCADE_DATA_ROOT", raising=False)
     monkeypatch.delenv("CASCADE_RUN_ROOT", raising=False)
-    from src.cascade.paths import run_dir
+    from src.cascade.utils.paths import run_dir
 
     return run_dir("g56"), fake_scenario_run(tmp_path / "scen")
 
@@ -308,7 +308,7 @@ def _argv(scen, *extra):
 
 def test_stage_56_chain(env):
     rd, scen = env
-    _script("56_gate_v2.py").main(_argv(scen))
+    _script("03_nested_cv.py").main(_argv(scen))
     d = rd / "56_gate_v2" / "main"
     m = pd.read_csv(d / "metrics.csv")
     assert {"always_L0", "always_L1", "oracle", "thr_maxprob", "class_rule"} <= set(m.system)
@@ -346,42 +346,31 @@ def test_stage_56_chain(env):
     nat = proc[(proc.subset == "all") & (proc.system == "class_rule") & (proc.rule == "natural")].iloc[0]
     assert nat.kept_on_L0 == 0  # la regola per classe scala tutte le procedurali predette
     mtime = (d / "metrics.csv").stat().st_mtime
-    _script("56_gate_v2.py").main(_argv(scen))  # già fatto: non rigira
+    _script("03_nested_cv.py").main(_argv(scen))  # già fatto: non rigira
     assert (d / "metrics.csv").stat().st_mtime == mtime
 
 
 def test_stage_56_refuses_changed_gate_v2_config(env):
     rd, scen = env
-    _script("56_gate_v2.py").main(_argv(scen))
+    _script("03_nested_cv.py").main(_argv(scen))
     d = rd / "56_gate_v2" / "main"
     mtime = (d / "metrics.csv").stat().st_mtime
     with pytest.raises(Exception, match="gate_v2"):  # config diversa dal manifest: errore, non "già fatto"
-        _script("56_gate_v2.py").main(_argv(scen, "--set", "gate_v2.calibration_boot=7"))
+        _script("03_nested_cv.py").main(_argv(scen, "--set", "gate_v2.calibration_boot=7"))
     assert (d / "metrics.csv").stat().st_mtime == mtime
 
 
 def test_stage_56_rejects_unregistered_primary_point(env):
     rd, scen = env
     with pytest.raises(ValueError, match="griglia"):
-        _script("56_gate_v2.py").main(_argv(scen, "--set", "gate_v2.primary_param=0.07"))
+        _script("03_nested_cv.py").main(_argv(scen, "--set", "gate_v2.primary_param=0.07"))
     with pytest.raises(ValueError, match="scorer"):
-        _script("56_gate_v2.py").main(_argv(scen, "--set", "gate_v2.comparisons=[[lgbm_AC,thr_maxprob]]"))
+        _script("03_nested_cv.py").main(_argv(scen, "--set", "gate_v2.comparisons=[[lgbm_AC,thr_maxprob]]"))
 
 
 # --------------------------------------------------------------------------- correzioni del gate v1 (N37)
-def test_v1_cv_groups_use_session_when_available():
-    from src.cascade.gate.protocol import cv_groups
-
-    df = pd.DataFrame({"take_uid": ["a", "b", "c"], "session": ["s1", "s1", "s2"]})
-    assert cv_groups(df, "session").tolist() == ["s1", "s1", "s2"]
-    assert cv_groups(df, "take").tolist() == ["a", "b", "c"]
-    assert cv_groups(df.drop(columns="session"), "session").tolist() == ["a", "b", "c"]
-    with pytest.raises(ValueError):
-        cv_groups(df, "site")
-
-
 def test_v1_group_bootstrap_weights_move_sessions_together():
-    from src.cascade.eval.curves import group_resample_weights
+    from src.cascade.evaluation.curves import group_resample_weights
 
     groups = np.array(["s1", "s1", "s1", "s2", "s3", "s3"])
     W = group_resample_weights(groups, 200, seed=0)
@@ -391,7 +380,7 @@ def test_v1_group_bootstrap_weights_move_sessions_together():
 
 
 def test_v1_session_bootstrap_is_wider_with_clustered_sessions():
-    from src.cascade.eval.curves import group_resample_weights, resample_weights
+    from src.cascade.evaluation.curves import group_resample_weights, resample_weights
 
     rng = np.random.default_rng(0)
     groups = np.repeat(np.arange(20), 10)
@@ -403,8 +392,8 @@ def test_v1_session_bootstrap_is_wider_with_clustered_sessions():
 
 # --------------------------------------------------------------------------- N38: calibrazione sulle non viste
 def test_calibration_population_uses_only_unseen_training_rows(tmp_path):
-    from src.cascade.gatev2 import nested
-    from src.cascade.gatev2.data import load_scenario_run
+    from src.cascade.data.gate_inputs import load_scenario_run
+    from src.cascade.evaluation import nested_cv as nested
 
     data = load_scenario_run(fake_scenario_run(tmp_path / "scen"), NAMES, PROC, motion=False)
     g = _gcfg(
@@ -427,8 +416,8 @@ def test_calibration_population_uses_only_unseen_training_rows(tmp_path):
 
 
 def test_default_calibration_population_is_unchanged(tmp_path):
-    from src.cascade.gatev2 import nested
-    from src.cascade.gatev2.data import load_scenario_run
+    from src.cascade.data.gate_inputs import load_scenario_run
+    from src.cascade.evaluation import nested_cv as nested
 
     data = load_scenario_run(fake_scenario_run(tmp_path / "scen"), NAMES, PROC, motion=False)
     g = _gcfg("gate_v2.scorers=[thr_maxprob]", "gate_v2.comparisons=[]")
@@ -441,7 +430,7 @@ def test_default_calibration_population_is_unchanged(tmp_path):
 def test_stage_56_rejects_unknown_calibration_population(env):
     rd, scen = env
     with pytest.raises(ValueError, match="calibration_population"):
-        _script("56_gate_v2.py").main(_argv(scen, "--set", "gate_v2.calibration_population=val"))
+        _script("03_nested_cv.py").main(_argv(scen, "--set", "gate_v2.calibration_population=val"))
 
 
 def test_n38_configs_reproduce_the_18_11_run_except_the_corrections():

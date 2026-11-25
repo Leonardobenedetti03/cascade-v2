@@ -1,8 +1,0 @@
-# Run del gate sulle predizioni di scenario_preds (N28): stadi 40 -> 44 -> 50, senza 00-45.
-#   SCEN_RUN=$HOME/scenario_runs/official_v2 RUN_NAME=scenario_v1 hpc/gate_scenario.sh
-# Classi (6), fusione replace, punto di lavoro "entro 1 punto da always_L1" su val: base.yaml, gate.yaml, labels.yaml.
-run_name: scenario_v1
-
-egovlp:
-  zero_shot:
-    enabled: false   # D8: nessun modello di testo, nessun download sui nodi senza rete

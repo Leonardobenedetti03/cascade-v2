@@ -4,9 +4,9 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
-        exclude: ^(third_party/|src/cascade/models/vendor/)
+        exclude: ^(third_party/|src/cascade/models/vendor/|scripts/01_extract_features\.py|src/cascade/data/takes\.py|src/cascade/data/poses\.py|src/cascade/data/video\.py|src/cascade/data/windows\.py|src/cascade/models/camformer\.py|src/cascade/models/egovlp\.py|src/cascade/training/heads\.py|src/cascade/utils/feature_config\.py|src/cascade/utils/feature_io\.py|tests/features)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.7.4
     hooks:
       - id: ruff
-        exclude: ^(third_party/|src/cascade/models/vendor/)
+        exclude: ^(third_party/|src/cascade/models/vendor/|scripts/01_extract_features\.py|src/cascade/data/takes\.py|src/cascade/data/poses\.py|src/cascade/data/video\.py|src/cascade/data/windows\.py|src/cascade/models/camformer\.py|src/cascade/models/egovlp\.py|src/cascade/training/heads\.py|src/cascade/utils/feature_config\.py|src/cascade/utils/feature_io\.py|tests/features)

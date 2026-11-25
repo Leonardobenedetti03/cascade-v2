@@ -7,14 +7,14 @@ import pytest
 torch = pytest.importorskip("torch")
 pytest.importorskip("einops")
 
-from src.cascade.config import load_config  # noqa: E402
-from src.cascade.models.egovlp import (  # noqa: E402
+from src.cascade.models.gmac.egovlp import (  # noqa: E402
     TextEncoder,
     build_video_model,
     load_video_weights,
     normalize,
     zero_shot_logits,
 )
+from src.cascade.utils.config import load_config  # noqa: E402
 
 
 def _arch(**kw):
@@ -35,7 +35,7 @@ def test_load_weights_module_prefix_and_text_ignored():
     sd = {"module." + k: v.clone() for k, v in src.state_dict().items()}
     sd["module.text_model.embeddings.word_embeddings.weight"] = torch.zeros(3, 3)
     sd["module.txt_proj.1.weight"] = torch.zeros(16, 768)
-    from src.cascade.models.egovlp import _strip_module
+    from src.cascade.models.gmac.egovlp import _strip_module
 
     dst = build_video_model(_arch())
     info = load_video_weights(dst, _strip_module(sd))
@@ -85,7 +85,7 @@ def _real_ckpt():
 
 @pytest.mark.skipif(not (_real_ckpt() and _real_ckpt().exists()), reason="checkpoint EgoVLP reale assente")
 def test_real_checkpoint_loads():
-    from src.cascade.models.egovlp import load_state
+    from src.cascade.models.gmac.egovlp import load_state
 
     load_video_weights(build_video_model(load_config().egovlp.arch), load_state(_real_ckpt()))
 
@@ -96,7 +96,7 @@ def test_load_state_ignores_classes_missing_from_the_path(tmp_path, monkeypatch)
     import sys
     import types
 
-    from src.cascade.models.egovlp import load_state
+    from src.cascade.models.gmac.egovlp import load_state
 
     fake = types.ModuleType("parse_config")
 

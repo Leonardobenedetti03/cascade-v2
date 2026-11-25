@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from src.cascade.cost import cascade_gmacs, macs_to_gmacs, max_escalations, relative_cost
+from src.cascade.evaluation.cost import cascade_gmacs, macs_to_gmacs, max_escalations, relative_cost
 
 
 def test_macs_to_gmacs():
@@ -85,8 +85,8 @@ def test_relative_cost():
 
 def test_expected_camformer_matches_base_arch():
     """I6: cost.expected.camformer di base.yaml coerente con l'architettura e il contesto reali."""
-    from src.cascade.config import load_config
-    from src.cascade.cost import camformer_macs
+    from src.cascade.evaluation.cost import camformer_macs
+    from src.cascade.utils.config import load_config
 
     cfg = load_config()
     T = int(round((cfg.camformer.context_s or cfg.data.window_s) * cfg.data.traj_fps))

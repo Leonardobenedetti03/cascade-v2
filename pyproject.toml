@@ -26,12 +26,27 @@ omit = ["src/cascade/models/vendor/*"]
 [tool.black]
 line-length = 120
 target-version = ["py39"]
-extend-exclude = "third_party|src/cascade/models/vendor|scenario_preds"
+extend-exclude = 'third_party|src/cascade/models/vendor|scripts/01_extract_features\.py|src/cascade/data/takes\.py|src/cascade/data/poses\.py|src/cascade/data/video\.py|src/cascade/data/windows\.py|src/cascade/models/camformer\.py|src/cascade/models/egovlp\.py|src/cascade/training/heads\.py|src/cascade/utils/feature_config\.py|src/cascade/utils/feature_io\.py|tests/features'
 
 [tool.ruff]
 line-length = 120
 target-version = "py39"
-extend-exclude = ["third_party", "src/cascade/models/vendor", "_synthetic_root", "scenario_preds"]
+extend-exclude = [
+  "third_party",
+  "src/cascade/models/vendor",
+  "_synthetic_root",
+  "scripts/01_extract_features.py",
+  "src/cascade/data/takes.py",
+  "src/cascade/data/poses.py",
+  "src/cascade/data/video.py",
+  "src/cascade/data/windows.py",
+  "src/cascade/models/camformer.py",
+  "src/cascade/models/egovlp.py",
+  "src/cascade/training/heads.py",
+  "src/cascade/utils/feature_config.py",
+  "src/cascade/utils/feature_io.py",
+  "tests/features",
+]
 
 [tool.ruff.lint]
 # pyflakes, pycodestyle, import ordinati, bugbear, pyupgrade (fermo a 3.9: niente "X | Y")

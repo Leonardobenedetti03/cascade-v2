@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.cascade.config import load_config
-from src.cascade.manifest import (
+from src.cascade.utils.config import load_config
+from src.cascade.utils.manifest import (
     CLIP_DEPENDENT_STAGES,
     CLIP_KEYS,
     SPLIT_DEPENDENT_STAGES,

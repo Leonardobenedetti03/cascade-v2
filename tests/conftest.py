@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.cascade.cli import open_stage, stage_parser
+from src.cascade.utils.cli import open_stage, stage_parser
 
 SMALL = [
     "synthetic.takes_per_class={train: 5, val: 2, test: 2}",

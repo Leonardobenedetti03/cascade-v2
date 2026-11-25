@@ -2,6 +2,7 @@
 /logs/
 # parametri personali del cluster
 hpc/env.local.sh
+hpc/features_env.local.sh
 # ambienti, cache, output pesanti
 .venv/
 __pycache__/

@@ -1,7 +1,7 @@
 import pytest
 
 from src import dl4cv_root
-from src.cascade import paths
+from src.cascade.utils import paths
 
 
 def test_missing_root_is_explicit_error(monkeypatch):

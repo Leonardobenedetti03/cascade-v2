@@ -1,6 +1,6 @@
 import pytest
 
-from src.cascade.config import config_from_dict, deep_merge, load_config
+from src.cascade.utils.config import config_from_dict, deep_merge, load_config
 
 
 def test_defaults_load():

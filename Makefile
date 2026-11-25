@@ -1,14 +1,13 @@
 # Comandi di sviluppo. Python dell'ambiente attivo (es. ~/envs/dl4cv).
 PY ?= python3
 
-.PHONY: help test cov lint format synthetic clean
+.PHONY: help test cov lint format clean
 
 help:
 	@echo "make test       - pytest (solo CPU, < 3 minuti)"
 	@echo "make cov        - pytest con copertura di src/"
 	@echo "make lint       - ruff + black --check"
 	@echo "make format     - black + ruff --fix"
-	@echo "make synthetic  - pipeline completa su dati sintetici (00 -> 55)"
 	@echo "make clean      - rimuove cache Python e la run sintetica locale"
 
 test:
@@ -24,9 +23,6 @@ lint:
 format:
 	black src scripts tests
 	ruff check --fix src scripts tests
-
-synthetic:
-	scripts/run_synthetic_pipeline.sh --clean
 
 clean:
 	find . -name __pycache__ -prune -exec rm -rf {} +

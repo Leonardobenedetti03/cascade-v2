@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from src.cascade.motion import MOTION_FEATURES, dominant_frequency, motion_features
+from src.cascade.data.motion import MOTION_FEATURES, dominant_frequency, motion_features
 
 
 def _poses(n=200, fps=20.0, f=1.5, amp=0.05, vx=0.0, yaw_rate=0.0):

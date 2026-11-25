@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import recall_score
 
-from src.cascade.eval.curves import (
+from src.cascade.evaluation.curves import (
     acc_at_budget,
     area_norm,
     balanced_acc,

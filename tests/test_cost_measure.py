@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from src.cascade.cost import measure_gmacs, measure_latency_ms  # noqa: E402
+from src.cascade.evaluation.cost import measure_gmacs, measure_latency_ms  # noqa: E402
 
 
 def test_linear_counts_exact():
