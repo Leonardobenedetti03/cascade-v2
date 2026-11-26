@@ -11,6 +11,9 @@ The SLURM log of each run sits next to its outputs.
   report.
 - `nested_cv/preregistered_772601/`: the run we planned in advance, before we found the leak in the class-reliability
   feature. Not in the report.
+- `report/`: Figures 2 and 3 and Tables 1, 2 and 3 of the report, made from `nested_cv/report_n38_cal/` by
+  `scripts/05_make_report_figures.py` and `scripts/06_make_report_tables.py`, with the numbers behind each figure and
+  table as CSV files and the tables as the report rounds them in `tables.md`.
 - `features/official_v2/`: the per-take predictions of the CamFormer and EgoVLP heads (`scripts/01_extract_features.py`).
   The report uses them for the labels and to know which takes CamFormer was pre-trained on.
 - `features/input_variant_selection/`: how we chose the pose convention and the number of windows (6 candidates,

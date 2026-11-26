@@ -7,7 +7,7 @@ How to read it:
 
 - **M01–M20** are the changes with respect to our plan (the "blueprint") and to our first codebase (v1), one row
   each, with the commit that brings them in.
-- **N1–N42** are working notes: choices the blueprint did not foresee, or foresaw differently, and the results we
+- **N1–N43** are working notes: choices the blueprint did not foresee, or foresaw differently, and the results we
   froze before looking at the next step.
 - **C01, C14d, ...** are commit labels. Each commit message starts with its label, so you can find it with
   `git log --grep`. We cite labels and not hashes, because labels survive a rewrite of the history.
@@ -800,3 +800,18 @@ and evaluation in separate places, clean names), we moved the code that produced
   rewritten for the current scripts (`docs/hpc_runbook.md`); the notes of the feature package merged into the README;
   the summary of 18/11 translated (`results/first_evaluation_vs_nested_cv.md`). In this file we replaced the commit
   hashes with commit labels.
+
+**N43 — C30: figures and tables of the report in `results/report/` (26/11).** The course rules ask for the plots and
+key tables in the results folder. We could not find the LaTeX sources of the report, which had their own plotting
+scripts, so we wrote two new scripts that read only `results/nested_cv/report_n38_cal/` (and the labels of the feature
+run), checked against the PDF of the report:
+- `scripts/05_make_report_figures.py` draws Figure 2 (accuracy against compute for the cost rule over β, with the
+  ranking line, the oracle and EgoVLP alone, on the unseen takes and on all takes) and Figure 3 (reliability of the
+  threshold gate's risk, 10 equal-count bins). It also writes the numbers behind each figure as CSV. The figures
+  show the same values as the PDF; fonts and axis style differ a little.
+- `scripts/06_make_report_tables.py` builds Tables 1, 2 and 3 as CSV files and as `tables.md`, rounded like the
+  report. Every number matches the report except the one already known: the upper end of the interval of
+  "CamFormer only" in Table 1 is .922, not .923 (N42).
+- Figure 1 is a diagram of the cascade, not a result, so it has no script.
+- No code of the pipeline changes, and no result file is rewritten: the two scripts only add files under
+  `results/report/`.

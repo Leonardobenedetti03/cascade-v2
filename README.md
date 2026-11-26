@@ -132,6 +132,18 @@ python scripts/04_check_report_numbers.py
 This recomputes 162 numbers of the report from `results/` and prints them next to the values in the paper. All of
 them match. It needs neither data nor a GPU, so you can run it right after cloning.
 
+### 5. Figures and tables of the report
+
+```bash
+python scripts/05_make_report_figures.py
+python scripts/06_make_report_tables.py
+```
+
+These draw Figures 2 and 3 and build Tables 1, 2 and 3 from the same files, into `results/report/`. Each figure comes
+with the numbers behind it as a CSV, and `results/report/tables.md` shows the tables rounded as in the report.
+Figure 1 is a diagram of the cascade drawn in LaTeX, so it has no script. Like step 4, this runs in a few seconds
+right after cloning.
+
 ## The feature pipeline
 
 Step 1 is our version of a package Giorgio wrote for the project (`scenario_preds`). It gives every take of the subset
@@ -201,13 +213,13 @@ Result files are in `results/nested_cv/report_n38_cal/` unless another folder is
 | 3.5 Cost accounting | `evaluation/cost.py`, `models/gmac/` | `cost_vs_egovlp.csv` |
 | 4 Datasets | `data/takes.py`, `data/poses.py`, `data/windows.py` | `results/features/` |
 | 5.1 Protocol | `evaluation/nested_cv.py`, `data/folds.py` | `outer_folds.csv` |
-| Tab. 1, Fig. 2, 5.2 (RQ1) | `evaluation/metrics.py`, `evaluation/curves.py` | `metrics.csv`, `cost_vs_egovlp.csv`, `curves.csv` |
-| Tab. 2, 5.3 (RQ2) | `evaluation/metrics.py`, `evaluation/curves.py` | `auc.csv`, `curves.csv`, `comparisons.csv`, `procedural.csv` |
-| Tab. 3 | `scripts/04_check_report_numbers.py` | `takes.csv.gz` |
+| Tab. 1, Fig. 2, 5.2 (RQ1) | `evaluation/metrics.py`, `evaluation/curves.py` | `metrics.csv`, `cost_vs_egovlp.csv`, `curves.csv`; drawn in `results/report/` |
+| Tab. 2, 5.3 (RQ2) | `evaluation/metrics.py`, `evaluation/curves.py` | `auc.csv`, `curves.csv`, `comparisons.csv`, `procedural.csv`; table in `results/report/` |
+| Tab. 3 | `scripts/06_make_report_tables.py` | `takes.csv.gz`; table in `results/report/` |
 | 5.4 Why motion does not help | `models/gates.py` | `importance.csv` |
-| 5.5, Fig. 3 Calibration and guarantee | `training/calibration.py`, `evaluation/rules.py` | `calibration.csv`, `thresholds.csv` |
+| 5.5, Fig. 3 Calibration and guarantee | `training/calibration.py`, `evaluation/rules.py` | `calibration.csv`, `thresholds.csv`; figure in `results/report/` |
 
-Code paths are under `src/cascade/`.
+Code paths are under `src/cascade/` unless they start with `scripts/`.
 
 ## Names used in the code
 
