@@ -1,10 +1,10 @@
-"""Teste lineari sulle embedding congelate, rifatte dentro la CV annidata (gate v2, N37).
+"""Linear heads on the frozen embeddings, refit inside the nested CV (gate v2, N37).
 
-Stesso protocollo di ``scenario_preds/scenario/heads.py::fit_head`` (copia, come per ``compute_windows`` nel
-ponte 44): StandardScaler + regressione logistica multinomiale, C scelto in CV interna raggruppata per sessione
-(log-loss), temperatura stimata sui logit fuori campione della stessa CV con il C scelto. Classi con meno di due
-sessioni nel fit restano fuori dalla CV interna ma dentro il fit finale; classi assenti dal fit ricevono un logit
-molto negativo.
+Same protocol as ``scenario_preds/scenario/heads.py::fit_head`` (now ``training/heads.py``; we copied it, as we
+did for ``compute_windows`` in the bridge stage 44): StandardScaler + multinomial logistic regression, C chosen
+by inner CV grouped by session (log-loss), temperature fitted on the out-of-sample logits of the same CV with
+the chosen C. Classes with fewer than two sessions in the fit stay out of the inner CV but are in the final fit.
+Classes missing from the fit get a very negative logit.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def _model(C: float, max_iter: int, class_weight: Optional[str], seed: int):
 
 def _fit(m, X, y):
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # convergenza e classi assenti: attesi su fold piccole
+        warnings.simplefilter("ignore")  # convergence and missing classes: expected on small folds
         return m.fit(X, y)
 
 

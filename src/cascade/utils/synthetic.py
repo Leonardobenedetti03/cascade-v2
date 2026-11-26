@@ -1,23 +1,22 @@
-"""Dataset sintetico con lo stesso layout di quello reale, per ``--synthetic``.
+"""Synthetic dataset with the same layout as the real one, used with ``--synthetic``.
 
-Genera sotto ``<run_dir>/synthetic_data``:
+It creates, under ``<run_dir>/synthetic_data``:
 
-- ``scenario_cls.csv`` (colonne ``take_name, split, task, label`` come CamFormer,
-  con la colonna ``label`` in un ordine diverso da labels.yaml, come nel CSV vero);
+- ``scenario_cls.csv`` (columns ``take_name, split, task, label`` as in CamFormer, with the ``label``
+  column in an order different from labels.yaml, as in the real CSV);
 - ``takes.json`` (``take_uid, take_name, duration_sec, video_start_us, traj_start_us``);
-- ``takes/<take>/closed_loop_trajectory.csv`` in formato Aria
+- ``takes/<take>/closed_loop_trajectory.csv`` in the Aria format
   (``tracking_timestamp_us, t{x,y,z}_world_device, q{x,y,z,w}_world_device``);
-- ``takes/<take>/aria01_214-1.mp4``: video piccolo con colore per classe e una barra
-  la cui altezza segue la quota della traiettoria (serve a 15_alignment_check);
-- ``split_manifest.csv`` e ``annotations/ego_pose/<split>/camera_pose/<take>.json``: le pose per frame
-  (30 Hz, matrici mondo -> camera, tempo del video) nel formato che legge lo stadio 01, che nei dati
-  sintetici ha come radice la stessa cartella (``paths.pose_roots: ["{data}"]``).
+- ``takes/<take>/aria01_214-1.mp4``: a small video with one colour per class and a bar whose height
+  follows the height of the trajectory (used by 15_alignment_check);
+- ``split_manifest.csv`` and ``annotations/ego_pose/<split>/camera_pose/<take>.json``: per-frame poses
+  (30 Hz, world -> camera matrices, video time) in the format read by stage 01. On synthetic data stage 01
+  uses this same folder as its root (``paths.pose_roots: ["{data}"]``).
 
-La traiettoria parte ``traj_offset_s`` prima del video (orologio device in µs), così
-la modalità di allineamento ``device_us`` viene esercitata davvero. Le classi
-procedurali hanno parametri di moto sovrapposti: CamFormer le confonde.
-Alcune take sono senza video o senza traiettoria, per il report delle mancanti;
-una quota ``video_confusion`` di video ha il colore di un'altra classe (L1 non perfetto).
+The trajectory starts ``traj_offset_s`` before the video (device clock in µs), so the ``device_us``
+alignment mode is really tested. The procedural classes have overlapping motion parameters, so CamFormer
+confuses them. Some takes have no video or no trajectory, to test the report of missing files. A share
+``video_confusion`` of the videos has the colour of another class, so L1 is not perfect either.
 """
 
 from __future__ import annotations
@@ -44,8 +43,8 @@ TRAJ_COLUMNS = [
     "qw_world_device",
 ]
 
-# Parametri di moto per classe (nome di labels.yaml):
-# freq. di oscillazione verticale [Hz], ampiezza [m], velocità [m/s], yaw [rad/s], salita [m/s]
+# Motion parameters per class (names from labels.yaml):
+# vertical oscillation frequency [Hz], amplitude [m], speed [m/s], yaw [rad/s], climb [m/s]
 MOTION_PARAMS: Dict[str, Tuple[float, float, float, float, float]] = {
     "Basketball": (2.6, 0.05, 2.0, 0.8, 0.0),
     "Dance": (1.8, 0.08, 0.6, 1.5, 0.0),
@@ -71,14 +70,14 @@ CLASS_COLORS = np.array(
     dtype=np.float64,
 )
 
-# Ordine della colonna `label` del CSV vero (diverso da labels.yaml).
+# Order of the `label` column in the real CSV (different from labels.yaml).
 CSV_LABEL_ORDER = ["Health", "Dance", "Basketball", "Rock Climbing", "Cooking", "Soccer", "Music", "Bike Repair"]
 
 
 def synthetic_trajectory(
     cls_name: str, duration_s: float, hz: float, rng: np.random.Generator, t_offset_s: float = 0.0
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Traiettoria (t [s], pose [N,7] tx,ty,tz,qx,qy,qz,qw) per una classe."""
+    """Trajectory (t [s], poses [N,7] tx,ty,tz,qx,qy,qz,qw) for one class."""
     from scipy.spatial.transform import Rotation
 
     f, a, v, yaw_rate, climb = MOTION_PARAMS[cls_name]
@@ -101,14 +100,14 @@ def synthetic_trajectory(
 
 
 def write_video(path, frames: np.ndarray, fps: float) -> None:
-    """Scrive frame uint8 [T,H,W,3] in mp4 con PyAV."""
+    """Write uint8 frames [T,H,W,3] to an mp4 with PyAV."""
     import av
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with av.open(str(path), mode="w") as container:
         try:
             stream = container.add_stream("libx264", rate=int(round(fps)))
-        except Exception:  # noqa: BLE001 - build di ffmpeg senza x264
+        except Exception:  # noqa: BLE001 - ffmpeg build without x264
             stream = container.add_stream("mpeg4", rate=int(round(fps)))
         stream.width, stream.height = frames.shape[2], frames.shape[1]
         stream.pix_fmt = "yuv420p"
@@ -139,24 +138,24 @@ def synthetic_video(
 def synthetic_extrinsics(
     t: np.ndarray, poses: np.ndarray, offset_s: float, duration_s: float, src_fps: float = 30.0
 ) -> Dict[str, list]:
-    """Pose per frame nel formato di Ego-Exo4D: ``{indice: matrice 3x4 mondo -> camera}`` a ``src_fps``.
+    """Per-frame poses in the Ego-Exo4D format: ``{index: 3x4 world -> camera matrix}`` at ``src_fps``.
 
-    Il frame ``i`` è al tempo video ``i / src_fps``, cioè al tempo ``i / src_fps + offset_s`` della traiettoria
-    (la traiettoria parte ``offset_s`` prima del video). Serve allo stadio 01 (M08).
+    Frame ``i`` is at video time ``i / src_fps``, that is at trajectory time ``i / src_fps + offset_s`` (the
+    trajectory starts ``offset_s`` before the video). Used by stage 01 (M08).
     """
     from scipy.spatial.transform import Rotation, Slerp
 
     tv = np.arange(0, int(duration_s * src_fps) + 1) / src_fps + offset_s
     tv = np.clip(tv, t[0], t[-1])
     pos = np.stack([np.interp(tv, t, poses[:, k]) for k in range(3)], axis=1)
-    R = Slerp(t, Rotation.from_quat(poses[:, 3:]))(tv).as_matrix().transpose(0, 2, 1)  # camera -> mondo, poi trasposta
+    R = Slerp(t, Rotation.from_quat(poses[:, 3:]))(tv).as_matrix().transpose(0, 2, 1)  # camera -> world, transposed
     tr = -np.einsum("nij,nj->ni", R, pos)
     E = np.round(np.concatenate([R, tr[:, :, None]], axis=2), 6)
     return {str(i): E[i].tolist() for i in range(len(E))}
 
 
 def ensure_synthetic_dataset(ctx) -> None:
-    """Genera il dataset sintetico se manca (idempotente, marker ``.complete``)."""
+    """Create the synthetic dataset if it is missing (idempotent, with a ``.complete`` marker)."""
     root = ctx.data_root
     scfg = ctx.cfg.synthetic
     spec = json.dumps({"synthetic": ctx.cfg.to_dict()["synthetic"], "pose_source": 1}, sort_keys=True)
@@ -165,7 +164,7 @@ def ensure_synthetic_dataset(ctx) -> None:
         return
     log.info("genero il dataset sintetico in %s", root)
     root.mkdir(parents=True, exist_ok=True)
-    labels = ctx.scenario_labels or ctx.labels  # i dati sintetici sono sempre sugli 8 scenari
+    labels = ctx.scenario_labels or ctx.labels  # the synthetic data always has the 8 scenarios
     rng = make_rng(scfg.seed)
     rows, takes = [], []
     for split, n_per in scfg.takes_per_class.items():
@@ -204,11 +203,11 @@ def ensure_synthetic_dataset(ctx) -> None:
             (root / rel).write_text(json.dumps({"aria01": {"camera_extrinsics": ext}}))
             pose_rows.append({"take_name": r.take_name, "split": r.split, "camera_pose_file": rel})
         if r.take_name not in no_video:
-            # quota in tempo video: t_traj = t_video + offset
+            # height in video time: t_traj = t_video + offset
             def z_of_t(tv, _t=t, _z=poses[:, 2]):
                 return np.interp(tv + scfg.traj_offset_s, _t, _z)
 
-            vc = c  # una quota di video "difficili" ha l'aspetto di un'altra classe
+            vc = c  # a share of "hard" videos looks like another class
             if trng.random() < scfg.video_confusion:
                 vc = int(trng.choice([k for k in range(labels.num_classes) if k != c]))
             frames = synthetic_video(vc, z_of_t, duration, scfg.video_fps, scfg.video_size, trng)

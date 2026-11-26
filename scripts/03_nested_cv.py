@@ -1,22 +1,23 @@
-"""56 — Gate v2: CV annidata per sessione su tutte le take di scenario_preds (CPU, N37).
+"""Stage 56: gate v2, nested CV by session on all the scenario_preds takes (CPU, N37).
 
-Scopo:
-    Rifà la valutazione della cascata con un protocollo che non dipende dallo split ufficiale né dal test già
-    aperto (N34): tutte le take delle 6 classi si dividono in fold per sessione; per ogni fold esterna le teste
-    lineari di CamFormer ed EgoVLP si riaddestrano sulle altre fold, il gate si addestra su predizioni fuori
-    campione di CamFormer (CV interna), calibratore e soglie si stimano in cross-fitting, e tutto si applica
-    congelato alla fold esterna. Si ripete per ``gate_v2.repeats`` partizioni e si mediano le decisioni per take.
+What it does:
+    It redoes the evaluation of the cascade with a protocol that depends neither on the official split nor on
+    the test we had already opened (N34). All the takes of the 6 classes are split into folds by session. For
+    each outer fold, the linear heads of CamFormer and EgoVLP are retrained on the other folds, the gate is
+    trained on out-of-sample CamFormer predictions (inner CV), the calibrator and the thresholds are fitted by
+    cross-fitting, and everything is applied, frozen, to the outer fold. We repeat this for
+    ``gate_v2.repeats`` partitions and average the decisions per take.
 
-    Il gate vede solo l'uscita di CamFormer e la traiettoria. Label ed EgoVLP servono come target e per contare
-    gli errori. Non è una valutazione cieca: val e test ufficiali sono già stati analizzati (N33, N34); il
-    metodo e i valori sono fissati nel registro (N37) prima di questa run.
+    The gate only sees CamFormer's output and the trajectory. Labels and EgoVLP are used as targets and to
+    count errors. This is not a blind evaluation: the official val and test had already been analysed (N33,
+    N34). The method and its values were fixed in the decision log (N37) before this run.
 
 Input:
-    --scenario-run DIR: run di scenario_preds con index/takes.csv, features/{camformer,egovlp}.npz,
-    configs/heads.json e traj/<take>.npz (per il moto; senza, gruppo C = NaN imputato)
+    --scenario-run DIR: a scenario_preds run with index/takes.csv, features/{camformer,egovlp}.npz,
+    configs/heads.json and traj/<take>.npz (for motion; without it, group C = NaN, imputed)
 
 Output (<run_dir>/56_gate_v2/<tag>/):
-    takes.csv.gz (score, rischio e predizioni fuori campione per repeat e take), thresholds.csv, heads.csv,
+    takes.csv.gz (out-of-sample score, risk and predictions per repeat and take), thresholds.csv, heads.csv,
     importance.csv, outer_folds.csv, metrics.csv, models.csv, curves.csv, auc.csv, comparisons.csv,
     calibration.csv, procedural.csv, cost_sensitivity.csv, cost_vs_egovlp.csv, summary.json, config.yaml
 """

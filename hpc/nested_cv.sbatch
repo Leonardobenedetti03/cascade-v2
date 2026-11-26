@@ -1,11 +1,11 @@
 #!/bin/bash
-# hpc/nested_cv.sbatch - eseguito da hpc/nested_cv.sh: stadio 56 (gate v2).
+# hpc/nested_cv.sbatch - run by hpc/nested_cv.sh: stage 56 (gate v2).
 set -eo pipefail
 cd "${SLURM_SUBMIT_DIR:?lanciare con hpc/nested_cv.sh}"
 source hpc/env.sh
 source "$VENV/bin/activate"
 set -u
-export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1  # un thread per processo joblib
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1  # one thread per joblib process
 echo "[$(date -u +%FT%TZ)] gate v2 su scenario_preds: $SCEN_RUN -> run $RUN_NAME"
 CFG_ARGS=""
 if [[ -n "${CONFIG:-}" ]]; then CFG_ARGS="--config $CONFIG"; fi

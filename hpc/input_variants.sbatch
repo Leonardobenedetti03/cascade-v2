@@ -1,5 +1,5 @@
 #!/bin/bash
-# hpc/input_variants.sbatch - eseguito da hpc/input_variants.sh. Le candidate non usano mai il test (niente --eval-test).
+# hpc/input_variants.sbatch - run by hpc/input_variants.sh. The candidates never use the test (no --eval-test).
 #SBATCH --open-mode=append
 set -eo pipefail
 cd "${SLURM_SUBMIT_DIR:?lanciare con hpc/input_variants.sh}"

@@ -1,7 +1,7 @@
-"""Lettura delle uscite di scenario_preds, condivisa dallo stadio ponte 44 e dal gate v2 (stadio 56, N37).
+"""Reading the outputs of scenario_preds. Shared by the old bridge stage 44 and by the gate v2 (stage 56, N37).
 
-Le funzioni erano nello script ``44_scenario_bridge.py``; spostate qui senza modifiche perché il gate v2
-calcoli il moto esattamente come la cache del gate v1.
+These functions used to live in the script ``44_scenario_bridge.py``. We moved them here unchanged, so that
+the gate v2 computes motion exactly like the cache of the gate v1.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from src.cascade.data.motion import MOTION_FEATURES, motion_features
 
 
 def compute_windows(duration_s: float, length_s: float, n_windows: int, placement: str) -> List[Tuple[float, float]]:
-    """Copia di ``scenario/windows.py::compute_windows`` (stesse finestre delle embedding)."""
+    """Same as ``data/windows.py::compute_windows`` (once ``scenario/windows.py``), so the windows match."""
     if not np.isfinite(duration_s) or duration_s <= 0:
         return []
     if duration_s <= length_s:
@@ -37,7 +37,7 @@ def compute_windows(duration_s: float, length_s: float, n_windows: int, placemen
 
 
 def take_motion(traj_path: Path, windows, fps: float, vertical_axis: int) -> dict:
-    """Feature di moto mediate sulle finestre; NaN se la traiettoria manca (il gate le imputa)."""
+    """Motion features averaged over the windows; NaN if the trajectory is missing (the gate imputes them)."""
     if not traj_path.exists() or not windows:
         return {k: float("nan") for k in MOTION_FEATURES}
     with np.load(traj_path) as z:
@@ -51,6 +51,6 @@ def take_motion(traj_path: Path, windows, fps: float, vertical_axis: int) -> dic
 
 
 def load_npz(path: Path) -> Dict[str, np.ndarray]:
-    """``take_name -> embedding`` da ``features/<modello>.npz`` di scenario_preds."""
+    """``take_name -> embedding`` from the ``features/<model>.npz`` file of scenario_preds."""
     with np.load(path) as z:
         return {str(n): x for n, x in zip(z["take_name"], z["X"])}

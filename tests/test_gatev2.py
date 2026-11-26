@@ -1,5 +1,5 @@
-"""Gate v2 (N37, stadio 56): regole, calibratore, fold per sessione, feature senza fughe, CV annidata senza fughe
-di informazione, catena completa su una run finta di scenario_preds; correzioni del gate v1 (sessioni)."""
+"""Gate v2 (N37, stage 56): rules, calibrator, session folds, leak-free features, a nested CV that leaks no
+information, the full chain on a fake scenario_preds run; fixes to the gate v1 (sessions)."""
 
 import importlib.util
 import json
@@ -41,7 +41,7 @@ FAST = [
 
 
 def fake_scenario_run(d: Path, n_sessions=8, takes_per_session=4, seed=0, d0=32, d1=24) -> Path:
-    """CamFormer debole sulle procedurali (errori su cui lavora il gate), EgoVLP quasi perfetto."""
+    """CamFormer weak on the procedural classes (the errors the gate works on), EgoVLP almost perfect."""
     rng = np.random.default_rng(seed)
     for sub in ("index", "features", "configs", "traj"):
         (d / sub).mkdir(parents=True, exist_ok=True)
@@ -57,7 +57,7 @@ def fake_scenario_run(d: Path, n_sessions=8, takes_per_session=4, seed=0, d0=32,
                 split = ["train", "train", "val", "test"][s % 4]
                 cc = min(c, 5)
                 x0 = mu0[cc] + off + rng.normal(size=d0) * (2.2 if PROC[cc] else 1.0)
-                cam[take] = np.full(d0, np.nan) if i == 5 else x0  # una take senza embedding CamFormer
+                cam[take] = np.full(d0, np.nan) if i == 5 else x0  # one take without a CamFormer embedding
                 vid[take] = mu1[cc] + rng.normal(size=d1)
                 pre = "train" if split == "train" and t % 3 else ("val" if split != "train" else "none")
                 rows.append(
@@ -92,7 +92,7 @@ def _gcfg(*sets):
     return load_config([], list(FAST) + list(sets)).gate_v2
 
 
-# --------------------------------------------------------------------------- regole
+# Rules
 def test_clopper_pearson_matches_hand_values():
     assert clopper_pearson_upper(0, 96, 0.9) == pytest.approx(0.0237, abs=2e-4)
     assert clopper_pearson_upper(1, 96, 0.9) == pytest.approx(0.0399, abs=2e-4)
@@ -102,20 +102,20 @@ def test_clopper_pearson_matches_hand_values():
 def test_risk_threshold_picks_largest_valid_coverage_with_bonferroni():
     rng = np.random.default_rng(0)
     s = np.sort(rng.random(2000))
-    e = (np.arange(2000) >= 1600).astype(int)  # errori solo nel 20% di take con lo score più alto
+    e = (np.arange(2000) >= 1600).astype(int)  # errors only in the 20% of takes with the highest score
     info = risk_threshold(s, e, alpha=0.02, delta=0.1, grid=20)
     kept = s <= info["threshold"]
-    assert info["coverage_cal"] == pytest.approx(0.8, abs=1e-9)  # coperture oltre 0,8 includono errori
+    assert info["coverage_cal"] == pytest.approx(0.8, abs=1e-9)  # coverages above 0.8 include errors
     assert e[kept].sum() == 0
     assert clopper_pearson_upper(int(e[kept].sum()), int(kept.sum()), 1 - 0.1 / 20) <= 0.02
-    assert risk_threshold(s, np.ones_like(e), 0.05, 0.1, 20)["threshold"] == -np.inf  # nessuna copertura valida
-    assert risk_threshold(s, np.zeros_like(e), 0.05, 0.1, 20)["threshold"] == np.inf  # tiene tutto
+    assert risk_threshold(s, np.ones_like(e), 0.05, 0.1, 20)["threshold"] == -np.inf  # no valid coverage
+    assert risk_threshold(s, np.zeros_like(e), 0.05, 0.1, 20)["threshold"] == np.inf  # keeps everything
 
 
 def test_acc_target_and_budget_thresholds():
     s = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
     e = np.array([0, 0, 0, 0, 0, 0, 0, 1, 1, 1])
-    lam = acc_target_threshold(s, e, max_error_rate=0.1)  # al più 1 errore lasciato passare
+    lam = acc_target_threshold(s, e, max_error_rate=0.1)  # at most 1 error let through
     assert lam == 0.8 and e[s <= lam].sum() == 1
     assert acc_target_threshold(s, np.zeros(10, int), 0.0) == np.inf
     for rho in (0.1, 0.3, 0.5):
@@ -132,7 +132,7 @@ def test_cost_rule_threshold_is_beta_itself():
         escalate("boh", 0.05, None, r_hat, r_up, np.nan)
 
 
-# --------------------------------------------------------------------------- calibratore
+# Calibrator
 def test_platt_calibrator_recovers_risk_and_upper_bound():
     rng = np.random.default_rng(1)
     s = rng.uniform(0.001, 0.999, 4000)
@@ -147,7 +147,7 @@ def test_platt_calibrator_recovers_risk_and_upper_bound():
     small = Calibrator("platt", n_boot=50, delta=0.1, seed=0).fit(s[:200], e[:200], sess[:200])
     _, up_small = small.predict(s)
     r_small, _ = small.predict(s)
-    assert np.mean(up_small - r_small) > np.mean(up - r)  # meno dati -> limite più largo
+    assert np.mean(up_small - r_small) > np.mean(up - r)  # less data -> wider bound
 
 
 def test_calibrator_single_class_and_isotonic():
@@ -160,7 +160,7 @@ def test_calibrator_single_class_and_isotonic():
         Calibrator("beta")
 
 
-# --------------------------------------------------------------------------- fold e feature
+# Folds and features
 def test_session_folds_never_split_a_session():
     rng = np.random.default_rng(0)
     sess = np.repeat([f"s{i}" for i in range(60)], 5)
@@ -171,12 +171,12 @@ def test_session_folds_never_split_a_session():
     with pytest.raises(RuntimeError):
         check_grouping(np.r_[f[:-1], (f[-1] + 1) % 5], sess)
     with pytest.raises(ValueError):
-        session_folds(y[:10], sess[:10], 5, 0)  # 2 sessioni per 5 fold
+        session_folds(y[:10], sess[:10], 5, 0)  # 2 sessions for 5 folds
 
 
 def test_training_reliability_is_out_of_fold():
-    """N38: ogni riga di fit riceve l'affidabilità calcolata sulle ALTRE fold (fold per sessione, stratificate per
-    classe predetta); le righe nuove usano tutte le righe di fit."""
+    """N38: each fit row gets the reliability computed on the OTHER folds (folds by session, stratified by
+    predicted class); new rows use all the fit rows."""
     from src.cascade.data.folds import session_folds
 
     rng = np.random.default_rng(0)
@@ -201,12 +201,12 @@ def test_training_reliability_is_out_of_fold():
 
 @pytest.mark.parametrize("per_session", [1, 6])
 def test_training_reliability_is_not_correlated_with_own_error(per_session):
-    """Il difetto della run del 18/11: escludendo la sola sessione, dentro un training set il valore di una riga è una
-    funzione decrescente degli esiti della sua sessione (con sessioni di una take, la mediana dei dati, è un
-    leave-one-out esatto: correlazione +1,00 con l'errore; +0,62 con 6 take). Fuori fold resta piccola."""
+    """The flaw of the run of 18/11: leaving out only the row's own session, inside a training set the value of a
+    row is a decreasing function of the outcomes of its session (with one-take sessions, the median in our data, it
+    is exactly leave-one-out: correlation +1.00 with the error; +0.62 with 6 takes). Out of fold it stays small."""
     rng = np.random.default_rng(1)
     sess = np.repeat([f"s{i}" for i in range(60)], per_session)
-    P = np.tile(np.eye(6)[3] * 0.8 + 0.2 / 6, (len(sess), 1))  # tutte predette Cooking
+    P = np.tile(np.eye(6)[3] * 0.8 + 0.2 / 6, (len(sess), 1))  # all predicted Cooking
     err_rate = np.repeat(rng.uniform(0, 0.8, 60), per_session)
     y = np.where(rng.random(len(sess)) < err_rate, 0, 3)
     r = FeatureBuilder(["A", "B"], PROC).fit(P, y, sess, seed=0).train_reliability
@@ -223,10 +223,10 @@ def test_scorers_direction_and_unknown_names():
             make_scorer(bad, g, PROC)
 
 
-# --------------------------------------------------------------------------- CV annidata
+# Nested CV
 def test_nested_cv_has_no_leakage(tmp_path, monkeypatch):
-    """Nessuna take della fold esterna entra in una testa o in un gate di quella fold; il gate si addestra solo su
-    predizioni interne fuori campione e il cross-fitting non vede la fold del gate che valuta."""
+    """No take of the outer fold enters a head or a gate of that fold. The gate is trained only on inner
+    out-of-sample predictions, and the cross-fitting never sees the gate fold it evaluates."""
     from src.cascade.data.gate_inputs import load_scenario_run
     from src.cascade.evaluation import nested_cv as nested
     from src.cascade.models.gates import LogRegScorer
@@ -257,7 +257,7 @@ def test_nested_cv_has_no_leakage(tmp_path, monkeypatch):
         test_sess = set(data.sessions[fold == k])
         assert fits and all(not (f & test_rows) for f in fits)
         assert gate_fits and all(not (s & test_sess) for s in gate_fits)
-        # cross-fitting: g_folds fit sul sottoinsieme + 1 fit finale su tutto il train esterno
+        # cross-fitting: g_folds fits on the subset + 1 final fit on the whole outer train
         assert len(gate_fits) == g.gate_folds + 1
         assert all(len(s) < len(gate_fits[-1]) for s in gate_fits[:-1])
         assert set(res["takes"].take_name) == set(data.takes.take_name[fold == k])
@@ -280,7 +280,7 @@ def test_outer_l0_inner_mean_and_bad_value(tmp_path):
         nested.run_fold(data, g, 0, 0, fold)
 
 
-# --------------------------------------------------------------------------- stadio 56
+# Stage 56
 def _script(name):
     spec = importlib.util.spec_from_file_location("stage_" + name.replace(".py", ""), ROOT / "scripts" / name)
     mod = importlib.util.module_from_spec(spec)
@@ -303,7 +303,7 @@ def _argv(scen, *extra):
     out = ["--run-name", "g56", "--scenario-run", str(scen)]
     for o in FAST:
         out += ["--set", o]
-    return out + list(extra)  # gli override del test vincono su FAST
+    return out + list(extra)  # the test overrides win over FAST
 
 
 def test_stage_56_chain(env):
@@ -319,8 +319,8 @@ def test_stage_56_chain(env):
     l1 = allm[allm.system == "always_L1"].iloc[0]
     orc = allm[allm.system == "oracle"].iloc[0]
     assert l1.acc >= orc.acc - 1e-12 and orc.acc >= l0.acc and 0 < orc.rho < 1
-    assert l0.rho == pytest.approx(1 / 192)  # solo la take senza CamFormer va a EgoVLP
-    # regola a costo: β più piccolo -> più escalation
+    assert l0.rho == pytest.approx(1 / 192)  # only the take without CamFormer goes to EgoVLP
+    # cost rule: smaller β -> more escalation
     c = allm[(allm.system == "thr_maxprob") & (allm.rule == "cost")].sort_values("param")
     assert c.rho.is_monotonic_decreasing
     assert (m.acc_ci_low <= m.acc + 1e-12).all() and (m.acc <= m.acc_ci_high + 1e-12).all()
@@ -344,9 +344,9 @@ def test_stage_56_chain(env):
     assert cv.primary_beta.any() and "cost_vs_egovlp_primary" in s
     proc = pd.read_csv(d / "procedural.csv")
     nat = proc[(proc.subset == "all") & (proc.system == "class_rule") & (proc.rule == "natural")].iloc[0]
-    assert nat.kept_on_L0 == 0  # la regola per classe scala tutte le procedurali predette
+    assert nat.kept_on_L0 == 0  # the per-class rule escalates every predicted procedural take
     mtime = (d / "metrics.csv").stat().st_mtime
-    _script("03_nested_cv.py").main(_argv(scen))  # già fatto: non rigira
+    _script("03_nested_cv.py").main(_argv(scen))  # already done: it does not run again
     assert (d / "metrics.csv").stat().st_mtime == mtime
 
 
@@ -355,7 +355,7 @@ def test_stage_56_refuses_changed_gate_v2_config(env):
     _script("03_nested_cv.py").main(_argv(scen))
     d = rd / "56_gate_v2" / "main"
     mtime = (d / "metrics.csv").stat().st_mtime
-    with pytest.raises(Exception, match="gate_v2"):  # config diversa dal manifest: errore, non "già fatto"
+    with pytest.raises(Exception, match="gate_v2"):  # config different from the manifest: error, not "already done"
         _script("03_nested_cv.py").main(_argv(scen, "--set", "gate_v2.calibration_boot=7"))
     assert (d / "metrics.csv").stat().st_mtime == mtime
 
@@ -368,7 +368,7 @@ def test_stage_56_rejects_unregistered_primary_point(env):
         _script("03_nested_cv.py").main(_argv(scen, "--set", "gate_v2.comparisons=[[lgbm_AC,thr_maxprob]]"))
 
 
-# --------------------------------------------------------------------------- correzioni del gate v1 (N37)
+# Fixes to the gate v1 (N37)
 def test_v1_group_bootstrap_weights_move_sessions_together():
     from src.cascade.evaluation.curves import group_resample_weights
 
@@ -376,7 +376,7 @@ def test_v1_group_bootstrap_weights_move_sessions_together():
     W = group_resample_weights(groups, 200, seed=0)
     assert W.shape == (200, 6)
     assert (W[:, 0] == W[:, 1]).all() and (W[:, 1] == W[:, 2]).all() and (W[:, 4] == W[:, 5]).all()
-    assert (W[:, [0, 3, 4]].sum(1) == 3).all()  # 3 sessioni estratte per replica
+    assert (W[:, [0, 3, 4]].sum(1) == 3).all()  # 3 sessions drawn per replicate
 
 
 def test_v1_session_bootstrap_is_wider_with_clustered_sessions():
@@ -384,13 +384,13 @@ def test_v1_session_bootstrap_is_wider_with_clustered_sessions():
 
     rng = np.random.default_rng(0)
     groups = np.repeat(np.arange(20), 10)
-    x = np.repeat(rng.integers(0, 2, 20), 10).astype(float)  # take identiche dentro la sessione
+    x = np.repeat(rng.integers(0, 2, 20), 10).astype(float)  # identical takes within the session
     sd_take = (resample_weights(200, 500, 1) @ x / 200).std()
     sd_sess = (group_resample_weights(groups, 500, 1) @ x / 200).std()
     assert sd_sess > 2 * sd_take
 
 
-# --------------------------------------------------------------------------- N38: calibrazione sulle non viste
+# N38: calibration on the unseen takes
 def test_calibration_population_uses_only_unseen_training_rows(tmp_path):
     from src.cascade.data.gate_inputs import load_scenario_run
     from src.cascade.evaluation import nested_cv as nested
@@ -409,7 +409,7 @@ def test_calibration_population_uses_only_unseen_training_rows(tmp_path):
         tr0 = (fold != k) & data.has_l0
         assert set(th.cal_population) == {"pretrain_unseen"}
         assert (th.n_cal == int((tr0 & unseen).sum())).all()
-    g.calibration_min_errors = 10**6  # troppo pochi errori: si torna a tutte le righe, dichiarandolo
+    g.calibration_min_errors = 10**6  # too few errors: fall back to all rows, and say so
     th = pd.DataFrame(nested.run_fold(data, g, 0, 0, fold)["thresholds"])
     assert set(th.cal_population) == {"all_fallback"}
     assert (th.n_cal == int(((fold != 0) & data.has_l0).sum())).all()
@@ -434,7 +434,7 @@ def test_stage_56_rejects_unknown_calibration_population(env):
 
 
 def test_n38_configs_reproduce_the_18_11_run_except_the_corrections():
-    """Le config della run correttiva cambiano solo calibration_population rispetto alla run del 18/11."""
+    """The configs of the corrective run change only calibration_population compared with the run of 18/11."""
     import yaml
 
     base = load_config([]).gate_v2

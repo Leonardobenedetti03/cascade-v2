@@ -1,16 +1,17 @@
-"""Teste lineari sulle embedding congelate (stadio ``heads``), stesso protocollo per i due modelli.
+"""Linear heads on the frozen embeddings (stage ``heads``), with the same protocol for both models.
 
-Una riga = una take (embedding mediata sulle sue finestre). Per ogni fold k del train:
-- fit su train con fold != k e classe nella testa (Music e Bouldering esclusi);
-  StandardScaler + LogisticRegression multinomiale, C scelto in CV interna raggruppata per sessione
-  (log-loss), temperatura stimata sui logit fuori campione della CV interna con il C scelto;
-- predizione delle take di train della fold k (fuori campione, Bouldering compreso) e di val/test.
-Val e test: media delle probabilità calibrate dei K modelli di fold. Così ogni take ha una predizione
-fatta da un modello che non l'ha vista. Con più seed (partizioni in fold diverse) si ripete tutto e si
-mediano le probabilità: sul train restano fuori campione, su val e test diventano la media di K x seed modelli.
+One row = one take (embedding averaged over its windows). For each train fold k:
+- fit on the train takes with fold != k and a class in the head (Music and Bouldering are left out):
+  StandardScaler + multinomial LogisticRegression, C chosen by inner CV grouped by session (log-loss), and a
+  temperature fitted on the out-of-sample logits of the inner CV with the chosen C;
+- predict the train takes of fold k (out of sample, Bouldering included) and the val/test takes.
+For val and test we average the calibrated probabilities of the K fold models. This way every take gets a
+prediction from a model that has not seen it. With more seeds (different fold partitions) we repeat everything
+and average the probabilities: on train they stay out of sample, on val and test they become the mean of
+K x seeds models.
 
-Nota: con ``class_weight: balanced`` le probabilità includono la correzione dei pesi (le classi rare
-risultano più probabili che con le frequenze reali); la temperatura corregge la scala, non questo spostamento.
+Note: with ``class_weight: balanced`` the probabilities include the weight correction (rare classes look more
+likely than with the real frequencies). The temperature fixes the scale, not this shift.
 """
 
 from __future__ import annotations
@@ -55,7 +56,7 @@ def _fit(m, X, y):
 
 
 def logits_of(model, X: np.ndarray, n_classes: int) -> np.ndarray:
-    """Logit ``[N, C]`` anche se nel fit mancava qualche classe (logit molto negativo)."""
+    """Logits ``[N, C]`` even if some class was missing from the fit (very negative logit)."""
     raw = model.decision_function(X)
     classes = model[-1].classes_
     if raw.ndim == 1:
@@ -66,7 +67,7 @@ def logits_of(model, X: np.ndarray, n_classes: int) -> np.ndarray:
 
 
 def fit_head(X, y, groups, n_classes: int, hcfg: dict, seed: int):
-    """(modello, C, T). Classi con meno di 2 gruppi restano fuori dalla CV interna ma dentro il fit finale."""
+    """(model, C, T). Classes with fewer than 2 groups stay out of the inner CV but are in the final fit."""
     from sklearn.model_selection import StratifiedGroupKFold
 
     Cs = list(hcfg["Cs"])
@@ -95,7 +96,7 @@ def fit_head(X, y, groups, n_classes: int, hcfg: dict, seed: int):
 
 
 def cross_fit(X: np.ndarray, takes: pd.DataFrame, n_classes: int, hcfg: dict, seed: int, fold_col: str = "fold") -> Tuple[Dict[str, np.ndarray], pd.DataFrame]:
-    """Probabilità calibrate ``[N, C]`` per tutte le take con embedding; NaN dove manca l'embedding."""
+    """Calibrated probabilities ``[N, C]`` for all takes with an embedding; NaN where it is missing."""
     y = takes.label_idx.to_numpy()
     fold = takes[fold_col].to_numpy()
     split = takes.split.to_numpy()
@@ -129,7 +130,7 @@ def cross_fit(X: np.ndarray, takes: pd.DataFrame, n_classes: int, hcfg: dict, se
 
 
 def metrics(df: pd.DataFrame, classes: List[str], split: str, min_takes: int) -> Optional[dict]:
-    """Accuratezza, accuratezza bilanciata (classi con >= min_takes take), richiamo per classe."""
+    """Accuracy, balanced accuracy (classes with >= min_takes takes) and recall per class."""
     from sklearn.metrics import confusion_matrix
 
     labelled = df[(df.split == split) & (df.label_idx >= 0)]
@@ -142,7 +143,7 @@ def metrics(df: pd.DataFrame, classes: List[str], split: str, min_takes: int) ->
     kept = [classes[c] for c in range(len(classes)) if counts[c] >= min_takes]
     return {
         "n": int(len(d)),
-        "n_no_embedding": int(len(labelled) - len(d)),  # take etichettate senza predizione (fuori da queste metriche)
+        "n_no_embedding": int(len(labelled) - len(d)),  # labelled takes with no prediction (not in these metrics)
         "acc": float((y == p).mean()),
         "bacc": float(np.mean([recall[c] for c in kept])) if kept else float("nan"),
         "bacc_classes": kept,
@@ -153,10 +154,10 @@ def metrics(df: pd.DataFrame, classes: List[str], split: str, min_takes: int) ->
 
 
 def cross_fit_seeds(X: np.ndarray, takes: pd.DataFrame, n_classes: int, hcfg: dict, seeds: List[int]):
-    """:func:`cross_fit` per ogni seed (colonne ``fold_s<seed>`` dell'indice), probabilità mediate.
+    """:func:`cross_fit` for each seed (the ``fold_s<seed>`` columns of the index), with averaged probabilities.
 
-    Restituisce anche ``seed_sd``: deviazione standard tra i seed della probabilità della classe
-    predetta, per vedere quanto la predizione dipende dalla partizione in fold.
+    It also returns ``seed_sd``: the standard deviation across seeds of the probability of the predicted class,
+    to see how much the prediction depends on the fold partition.
     """
     runs, tabs, source = [], [], None
     for s in seeds:
@@ -180,8 +181,8 @@ def _bacc(y: np.ndarray, p: np.ndarray, keep: List[int]) -> float:
 
 
 def bacc_ci(df: pd.DataFrame, classes: List[str], split: str, min_takes: int, n_boot: int, level: float, seed: int = 0) -> Optional[Tuple[float, float]]:
-    """Intervallo bootstrap dell'accuratezza bilanciata, ricampionando le SESSIONI (take della stessa
-    sessione non sono indipendenti). Classi come in :func:`metrics`."""
+    """Bootstrap interval of the balanced accuracy, resampling SESSIONS (takes of the same session are not
+    independent). Classes as in :func:`metrics`."""
     d = df[(df.split == split) & (df.label_idx >= 0) & df.pred.notna()]
     if d.empty:
         return None
@@ -201,16 +202,16 @@ def bacc_ci(df: pd.DataFrame, classes: List[str], split: str, min_takes: int, n_
 
 
 def preregistered_check(df: pd.DataFrame, classes: List[str], ccfg: dict, hcfg: dict) -> dict:
-    """Controllo fissato nel registro prima della run, su un modello (di solito CamFormer = L0):
+    """Check written in the decision log before the run, on one model (usually CamFormer = L0):
 
-    1. sulla split ``ccfg['split']`` (train fuori campione, oppure val se esiste):
-       accuratezza bilanciata >= ``min_bacc``; con ``ci_above_chance: true`` anche il limite inferiore
-       dell'intervallo bootstrap sopra il caso (caso = 1 / numero di classi valutate);
-    2. sul train fuori campione: richiamo >= ``min_recall`` per ogni classe della testa presente nel train
-       (``min_recall: null`` = richiamo > 0);
-    3. con ``require_all_classes: true``: ogni classe della testa ha almeno una take valutata sia nello split
-       del controllo sia nel train (una classe non sparisce in silenzio dall'accuratezza bilanciata).
-    Il test non si usa mai qui.
+    1. on split ``ccfg['split']`` (out-of-sample train, or val if there is one): balanced accuracy
+       >= ``min_bacc``; with ``ci_above_chance: true`` the lower end of the bootstrap interval must also be
+       above chance (chance = 1 / number of evaluated classes);
+    2. on the out-of-sample train: recall >= ``min_recall`` for every head class present in train
+       (``min_recall: null`` = recall > 0);
+    3. with ``require_all_classes: true``: every head class has at least one evaluated take both in the split of
+       the check and in train (so a class cannot silently drop out of the balanced accuracy).
+    The test split is never used here.
     """
     split = ccfg["split"]
     if split == "test":

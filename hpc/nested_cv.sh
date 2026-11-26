@@ -1,10 +1,11 @@
 #!/bin/bash
-# hpc/nested_cv.sh - un job CPU con lo stadio 56 (gate v2, CV annidata per sessione su tutte le take, N37).
-# Uso:  SCEN_RUN=$HOME/scenario_runs/official_v2 RUN_NAME=gate_v2 hpc/nested_cv.sh
-#       N38: TAG=n38_rel CONFIG=configs/gate_v2_n38_rel.yaml SCEN_RUN=... RUN_NAME=gate_v2 hpc/nested_cv.sh
-#       (TAG = sottocartella degli output, default main; CONFIG = file di config aggiuntivo, facoltativo)
-# Serve una run di scenario_preds con le feature (features/camformer.npz, features/egovlp.npz), l'indice e traj/.
-# Prima di lanciarlo: valori di configs/gate_v2.yaml scritti nella voce N37 del registro.
+# hpc/nested_cv.sh - one CPU job with stage 56 (gate v2, nested CV by session on all takes, N37).
+# Usage:  SCEN_RUN=$HOME/scenario_runs/official_v2 RUN_NAME=gate_v2 hpc/nested_cv.sh
+#         N38: TAG=n38_rel CONFIG=configs/gate_v2_n38_rel.yaml SCEN_RUN=... RUN_NAME=gate_v2 hpc/nested_cv.sh
+#         (TAG = subfolder of the outputs, default main; CONFIG = an extra config file, optional)
+# The run in the report: TAG=n38_cal CONFIG=configs/gate_v2_n38_cal.yaml.
+# It needs a scenario_preds run with the features (features/camformer.npz, features/egovlp.npz), the index and traj/.
+# Before starting it, we wrote the values of configs/gate_v2.yaml in entry N37 of the decision log.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source hpc/env.sh

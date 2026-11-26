@@ -1,9 +1,9 @@
-# log di SLURM nel clone (ancorato: NON ignora results/<run>/logs)
+# SLURM logs in the clone (anchored, so results/<run>/logs is NOT ignored)
 /logs/
-# parametri personali del cluster
+# personal cluster settings
 hpc/env.local.sh
 hpc/features_env.local.sh
-# ambienti, cache, output pesanti
+# environments, caches, large outputs
 .venv/
 __pycache__/
 *.pyc
@@ -15,5 +15,5 @@ __pycache__/
 *.parquet
 .DS_Store
 
-# run sintetica locale
+# local synthetic run
 _synthetic_root/

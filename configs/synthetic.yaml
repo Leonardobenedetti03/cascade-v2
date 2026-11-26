@@ -1,5 +1,5 @@
-# Override per --synthetic: dati finti generati sotto {run}/synthetic_data, modelli
-# piccoli a pesi casuali, tutto su CPU in pochi minuti.
+# Overrides for --synthetic: fake data generated under {run}/synthetic_data, small models with
+# random weights, everything on CPU in a few minutes.
 run_name: synthetic
 paths:
   scenario_csv: "{data}/scenario_cls.csv"
@@ -9,12 +9,12 @@ paths:
   video_pattern: "{takes_root}/{take_name}/aria01_214-1.mp4"
   video_glob: "{takes_root}/{take_name}/*214-1*.mp4"
   traj_pattern: "{takes_root}/{take_name}/closed_loop_trajectory.csv"
-  pose_roots: ["{data}"]   # pose per frame finte, stesso layout della sorgente reale (stadio 01)
+  pose_roots: ["{data}"]   # fake per-frame poses, same layout as the real source (stage 01)
   camformer_ckpt: "{data}/checkpoints/missing.pt"
   egovlp_ckpt: "{data}/checkpoints/missing.pth"
 data:
   window_s: 4.0
-  expected_split_counts: null   # niente sanity check sui conteggi reali
+  expected_split_counts: null   # no sanity check on the real counts
 alignment:
   mode: device_us
 frames:
@@ -51,7 +51,7 @@ cost_e2e:
   n_clips: 12
   n_warmup: 2
 cost:
-  # i modelli sintetici sono minuscoli: si usano i costi delle architetture reali (misurati)
+  # the synthetic models are tiny, so we use the measured costs of the real architectures
   override_gmacs: {L0: 0.1216, L1: 92.31, Lhalf: 0.0153}
   timesformer_frames: [4]
   latency_reps: 2

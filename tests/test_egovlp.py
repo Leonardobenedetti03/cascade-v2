@@ -75,7 +75,7 @@ def test_zero_shot_follows_prompt_order():
     t = enc.encode(prompts)
     logits = zero_shot_logits(t[[2, 0, 1]], t, temperature=0.05)
     np.testing.assert_array_equal(logits.argmax(1), [2, 0, 1])
-    np.testing.assert_allclose(enc.encode(prompts), t)  # deterministico
+    np.testing.assert_allclose(enc.encode(prompts), t)  # deterministic
 
 
 def _real_ckpt():
@@ -91,8 +91,8 @@ def test_real_checkpoint_loads():
 
 
 def test_load_state_ignores_classes_missing_from_the_path(tmp_path, monkeypatch):
-    """Il checkpoint vero contiene un ``parse_config.ConfigParser`` del repository EgoVLP (errore visto sul
-    cluster il 16/11): ``load_state`` deve restituire lo ``state_dict`` anche senza quel modulo."""
+    """The real checkpoint contains a ``parse_config.ConfigParser`` from the EgoVLP repository (an error we hit on
+    the cluster on 16/11): ``load_state`` must return the ``state_dict`` even without that module."""
     import sys
     import types
 

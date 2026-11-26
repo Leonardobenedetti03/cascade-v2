@@ -1,20 +1,20 @@
-"""Curve accuratezza–costo della cascata e metriche derivate (C12b, M09 e M14).
+"""Accuracy–cost curves of the cascade and the metrics derived from them (C12b, M09 and M14).
 
-Decisione: si ordinano le clip per score (decrescente, a parità vince l'ordine di riga) e si
-scala il primo r% (r = 0..100). La predizione di una clip scalata è quella dopo l'escalation
-(con ``fusion.mode = replace``: quella di L1), altrimenti quella di CamFormer. Per take si media
-la log-probabilità delle sue clip e si prende l'argmax. Costo per take = n_clip · C0 + n_scalate · C1.
+Decision: we sort the clips by score (descending; ties keep the row order) and escalate the first r%
+(r = 0..100). An escalated clip takes the prediction after escalation (with ``fusion.mode = replace``, the one
+of L1), the others keep CamFormer's. For each take we average the log-probabilities of its clips and take the
+argmax. Cost per take = n_clips · C0 + n_escalated · C1.
 
-Tutte le metriche lavorano su array ``[..., R]`` così si applicano uguali alla curva puntuale e ai
-ricampionamenti bootstrap ``[B, R]``.
+All metrics work on arrays ``[..., R]``, so the same code applies to the point curve and to the bootstrap
+resamples ``[B, R]``.
 
-Novità rispetto alla v1:
-- accuratezza bilanciata (:func:`balanced_acc`): media sulle classi del richiamo per classe, con
-  le sole classi che hanno almeno ``min_takes`` take nello split (:func:`class_membership`);
-- fattore di miglioramento I(δ) di Lebovitz et al. (:func:`improvement_factor`);
-- soglie dal budget (:func:`threshold_at_rate`, :func:`threshold_for_budget`) per il trasferimento
-  val → test;
-- niente decisioni forzate del livello −1 (non portato, M12) e ``roc_auc`` da scikit-learn.
+New compared with v1:
+- balanced accuracy (:func:`balanced_acc`): mean over classes of the per-class recall, using only the classes
+  with at least ``min_takes`` takes in the split (:func:`class_membership`);
+- the improvement factor I(δ) of Lebovitz et al. (:func:`improvement_factor`);
+- thresholds from the budget (:func:`threshold_at_rate`, :func:`threshold_for_budget`), to carry them from val
+  to test;
+- no forced decisions of level −1 (not carried over, M12), and ``roc_auc`` from scikit-learn.
 """
 
 from __future__ import annotations
@@ -30,11 +30,11 @@ EPS = 1e-12
 
 @dataclass
 class CurveData:
-    r: np.ndarray  # [R] quota di escalation in %
-    correct: np.ndarray  # [R, T] correttezza per take (float: media sui seed)
+    r: np.ndarray  # [R] escalation share in %
+    correct: np.ndarray  # [R, T] correctness per take (float: mean over seeds)
     cost: np.ndarray  # [R, T] GMACs per take
     take_labels: np.ndarray  # [T]
-    member: Optional[np.ndarray] = None  # [C', T] indicatore delle take di ogni classe nella media
+    member: Optional[np.ndarray] = None  # [C', T] indicator of the takes of each class in the mean
 
     @property
     def acc(self) -> np.ndarray:
@@ -46,19 +46,19 @@ class CurveData:
 
     @property
     def bacc(self) -> np.ndarray:
-        """Accuratezza bilanciata per ogni r (NaN se nessuna classe entra nella media)."""
+        """Balanced accuracy for each r (NaN if no class enters the mean)."""
         if self.member is None:
             raise ValueError("CurveData senza membership delle classi: costruirla con cascade_curve")
         return balanced_acc(self.correct, self.member)
 
     @property
     def n_classes(self) -> int:
-        """Numero di classi nella media dell'accuratezza bilanciata."""
+        """Number of classes in the mean of the balanced accuracy."""
         return 0 if self.member is None else int(self.member.shape[0])
 
 
 def escalation_order(scores: np.ndarray) -> np.ndarray:
-    """Posizione di ogni clip nell'ordine di escalation (0 = prima a essere scalata)."""
+    """Position of each clip in the escalation order (0 = the first to be escalated)."""
     order = np.argsort(-np.asarray(scores, dtype=np.float64), kind="stable")
     pos = np.empty(len(order), dtype=np.int64)
     pos[order] = np.arange(len(order))
@@ -79,7 +79,7 @@ def evaluate_masks(
     gmacs_L0: float,
     gmacs_L1: float,
 ):
-    """Correttezza e costo per take per una o più maschere di escalation ``[R, N]``."""
+    """Correctness and cost per take for one or more escalation masks ``[R, N]``."""
     esc = np.atleast_2d(esc)
     uniq, inv = _take_index(take_uid)
     T = len(uniq)
@@ -114,7 +114,7 @@ def cascade_curve(
     if r[-1] != 100:
         r = np.append(r, 100)
     k = np.round(r / 100.0 * n).astype(int)
-    if fixed_r is not None:  # always_L0 / always_L1: stessa decisione per ogni r
+    if fixed_r is not None:  # always_L0 / always_L1: the same decision for every r
         k = np.full_like(k, int(round(fixed_r / 100.0 * n)))
     pos = escalation_order(scores)
     esc = pos[None, :] < k[:, None]
@@ -134,11 +134,11 @@ def mean_curve(curves) -> CurveData:
     )
 
 
-# ------------------------------------------------------------------ accuratezza bilanciata (M09, D5)
+# Balanced accuracy (M09, D5)
 def class_membership(take_labels: np.ndarray, n_classes: int, min_takes: int = 1) -> Tuple[np.ndarray, np.ndarray]:
-    """``(M [C', T], keep [C'])``: riga = indicatore delle take di una classe.
+    """``(M [C', T], keep [C'])``: each row is the indicator of the takes of one class.
 
-    Le classi con meno di ``min_takes`` take nello split non entrano nella media (es. Bouldering)."""
+    Classes with fewer than ``min_takes`` takes in the split do not enter the mean (e.g. Bouldering)."""
     take_labels = np.asarray(take_labels).astype(int)
     counts = np.bincount(take_labels, minlength=n_classes)
     keep = np.flatnonzero(counts >= max(int(min_takes), 1))
@@ -146,12 +146,11 @@ def class_membership(take_labels: np.ndarray, n_classes: int, min_takes: int = 1
 
 
 def balanced_acc(correct: np.ndarray, M: np.ndarray, W: Optional[np.ndarray] = None) -> np.ndarray:
-    """Media sulle classi del richiamo per classe (= ``balanced_accuracy_score`` di scikit-learn).
+    """Mean over classes of the per-class recall (= scikit-learn's ``balanced_accuracy_score``).
 
-    ``correct`` ``[R, T]`` correttezza per take; ``M`` ``[C, T]`` (:func:`class_membership`);
-    ``W`` ``[B, T]`` pesi bootstrap per take. Restituisce ``[R]`` (W assente) oppure ``[B, R]``.
-    Una classe assente da un ricampionamento esce dalla media di quel ricampionamento; senza
-    classi nella media il risultato è NaN."""
+    ``correct`` ``[R, T]`` correctness per take; ``M`` ``[C, T]`` (:func:`class_membership`); ``W`` ``[B, T]``
+    bootstrap weights per take. Returns ``[R]`` (without W) or ``[B, R]``. A class missing from a resample leaves
+    the mean of that resample; with no classes left the result is NaN."""
     single = W is None
     if single:
         W = np.ones((1, correct.shape[1]))
@@ -159,26 +158,26 @@ def balanced_acc(correct: np.ndarray, M: np.ndarray, W: Optional[np.ndarray] = N
         out = np.full((W.shape[0], correct.shape[0]), np.nan)
         return out[0] if single else out
     recalls = []
-    for m in M:  # una classe alla volta: [B, R]
-        den = np.einsum("bt,t->b", W, m)  # take della classe nel ricampionamento
+    for m in M:  # one class at a time: [B, R]
+        den = np.einsum("bt,t->b", W, m)  # takes of the class in the resample
         num = np.einsum("bt,rt->br", W * m, correct)
         recalls.append(np.where(den[:, None] > 0, num / np.maximum(den[:, None], EPS), np.nan))
-    with warnings.catch_warnings():  # ricampionamento senza nessuna classe: NaN, senza avviso
+    with warnings.catch_warnings():  # resample without any class: NaN, without a warning
         warnings.simplefilter("ignore", RuntimeWarning)
         out = np.nanmean(np.stack(recalls), axis=0)
     return out[0] if single else out
 
 
-# ------------------------------------------------------------------ metriche su [..., R]
+# Metrics on [..., R]
 def area_norm(cost: np.ndarray, acc: np.ndarray) -> np.ndarray:
-    """Area sotto acc(costo) con costo normalizzato in [0, 1] (= accuracy media)."""
+    """Area under acc(cost) with the cost normalised to [0, 1] (= mean accuracy)."""
     span = cost[..., -1:] - cost[..., :1]
     x = (cost - cost[..., :1]) / np.where(span > 0, span, 1.0)
     return np.sum(np.diff(x, axis=-1) * (acc[..., 1:] + acc[..., :-1]) / 2.0, axis=-1)
 
 
 def acc_at_budget(cost: np.ndarray, acc: np.ndarray, budget) -> np.ndarray:
-    """Accuracy all'r più grande con costo ≤ budget (costo crescente in r); NaN se irraggiungibile."""
+    """Accuracy at the largest r with cost ≤ budget (cost grows with r); NaN if out of reach."""
     budget = np.asarray(budget, dtype=float)[..., None]
     ok = cost <= budget * (1 + 1e-9)
     idx = np.where(ok.any(-1), ok.shape[-1] - 1 - np.argmax(ok[..., ::-1], axis=-1), 0)
@@ -187,18 +186,18 @@ def acc_at_budget(cost: np.ndarray, acc: np.ndarray, budget) -> np.ndarray:
 
 
 def min_cost_within(cost: np.ndarray, acc: np.ndarray, ref_acc, pts: float) -> np.ndarray:
-    """Costo minimo con acc ≥ ref_acc − pts (NaN se mai raggiunto)."""
+    """Lowest cost with acc ≥ ref_acc − pts (NaN if never reached)."""
     ok = acc >= np.asarray(ref_acc, dtype=float)[..., None] - pts - 1e-12
     c = np.where(ok, cost, np.inf).min(-1)
     return np.where(np.isfinite(c), c, np.nan)
 
 
 def improvement_factor(cost: np.ndarray, acc: np.ndarray, ref_acc, delta: float) -> np.ndarray:
-    """I(δ) = C_L1 / C(r*_δ), con r*_δ la quota minima che dà acc ≥ ref_acc − δ (Lebovitz et al., 2023).
+    """I(δ) = C_L1 / C(r*_δ) (Lebovitz et al., 2023), where r*_δ is the smallest share with acc ≥ ref_acc − δ.
 
-    Il numeratore è il costo di L1 da solo, letto dalla curva: ``cost[r = 100] − cost[r = 0]``.
-    Con ``replace`` a r = 100 la cascata ha l'accuratezza di L1, quindi I(δ) è sempre definito e vale
-    almeno C_L1 / (C_L0 + C_L1) ≈ 0,9987: sotto 1 la cascata non risparmia nulla."""
+    The numerator is the cost of L1 alone, read from the curve: ``cost[r = 100] − cost[r = 0]``.
+    With ``replace``, at r = 100 the cascade has the accuracy of L1, so I(δ) is always defined and is at least
+    C_L1 / (C_L0 + C_L1) ≈ 0.9987. Below 1 the cascade saves nothing."""
     c_l1 = cost[..., -1] - cost[..., 0]
     return _ratio(c_l1, min_cost_within(cost, acc, ref_acc, delta))
 
@@ -220,18 +219,17 @@ def auroc(scores: np.ndarray, y: np.ndarray) -> float:
 
 
 def resample_weights(n_takes: int, n_boot: int, seed: int) -> np.ndarray:
-    """Pesi bootstrap per take ``[B, T]`` (conteggi multinomiali)."""
+    """Bootstrap weights per take ``[B, T]`` (multinomial counts)."""
     rng = np.random.default_rng(seed)
     return rng.multinomial(n_takes, np.full(n_takes, 1.0 / n_takes), size=n_boot).astype(float)
 
 
 def group_resample_weights(take_groups: np.ndarray, n_boot: int, seed: int) -> np.ndarray:
-    """Pesi bootstrap ``[B, T]`` ricampionando i GRUPPI (es. sessioni) con reinserimento (N37).
+    """Bootstrap weights ``[B, T]`` that resample GROUPS (e.g. sessions) with replacement (N37).
 
-    ``take_groups[t]`` è il gruppo della take t, nell'ordine delle take della curva (``np.unique`` di
-    ``take_uid``). Ogni gruppo estratto porta con sé tutte le sue take: il peso di una take è il numero
-    di volte che il suo gruppo è stato estratto. Con un gruppo per take coincide in distribuzione con
-    :func:`resample_weights`."""
+    ``take_groups[t]`` is the group of take t, in the take order of the curve (``np.unique`` of ``take_uid``).
+    Each drawn group brings all its takes, so the weight of a take is the number of times its group was drawn.
+    With one group per take this has the same distribution as :func:`resample_weights`."""
     _, inv = np.unique(np.asarray(take_groups).astype(str), return_inverse=True)
     G = int(inv.max()) + 1
     rng = np.random.default_rng(seed)
@@ -240,16 +238,16 @@ def group_resample_weights(take_groups: np.ndarray, n_boot: int, seed: int) -> n
 
 
 def boot_curves(c: CurveData, W: np.ndarray):
-    """(acc [B, R], cost [B, R]) ricampionando le take con i pesi ``W``.
+    """(acc [B, R], cost [B, R]) resampling the takes with the weights ``W``.
 
-    Si usa ``einsum`` e non ``@``: con numpy 2.0 e Accelerate (macOS arm64) la moltiplicazione tra matrici
-    emette avvisi spuri («divide by zero / overflow / invalid value in matmul») su numeri finiti."""
+    We use ``einsum`` and not ``@``: with numpy 2.0 and Accelerate (macOS arm64), matrix multiplication gives
+    spurious warnings ("divide by zero / overflow / invalid value in matmul") on finite numbers."""
     T = c.correct.shape[1]
     return np.einsum("bt,rt->br", W, c.correct) / T, np.einsum("bt,rt->br", W, c.cost) / T
 
 
 def boot_bacc(c: CurveData, W: np.ndarray) -> np.ndarray:
-    """Accuratezza bilanciata ``[B, R]`` sugli stessi ricampionamenti di :func:`boot_curves`."""
+    """Balanced accuracy ``[B, R]`` on the same resamples as :func:`boot_curves`."""
     if c.member is None:
         raise ValueError("CurveData senza membership delle classi")
     return balanced_acc(c.correct, c.member, W)
@@ -269,8 +267,8 @@ def curve_metrics(
     acc_oracle_b=None,
     deltas: Sequence[float] = (),
 ) -> Dict[str, np.ndarray]:
-    """Metriche di una curva (o di B ricampionamenti). ``acc`` è l'accuratezza semplice o la
-    bilanciata: le chiavi sono le stesse, e chi chiama le distingue con un prefisso."""
+    """Metrics of one curve (or of B resamples). ``acc`` is either the plain or the balanced accuracy: the keys
+    are the same, and the caller tells them apart with a prefix."""
     out = {"area": area_norm(cost, acc), "acc_r0": acc[..., 0], "acc_r100": acc[..., -1]}
     for b in budgets:
         out[f"acc_at_{int(round(b * 100))}"] = acc_at_budget(cost, acc, np.asarray(ref_cost_L1) * b)
@@ -291,7 +289,7 @@ def curve_metrics(
 
 
 def _ratio(num, den) -> np.ndarray:
-    """``num / den``, NaN dove il denominatore è ~0 (oracolo = random), senza avvisi."""
+    """``num / den``, NaN where the denominator is ~0 (oracle = random), without warnings."""
     num, den = np.broadcast_arrays(np.asarray(num, dtype=float), np.asarray(den, dtype=float))
     out = np.full(num.shape, np.nan)
     ok = np.abs(den) > 1e-12
@@ -299,19 +297,19 @@ def _ratio(num, den) -> np.ndarray:
     return out
 
 
-# ------------------------------------------------------------------ soglie e budget (M09, RQ1)
+# Thresholds and budget (M09, RQ1)
 def threshold_at_rate(scores: np.ndarray, rate: float) -> float:
-    """Soglia che scala la quota ``rate`` delle clip (si scala se score >= soglia); ``inf`` se è 0."""
+    """Threshold that escalates the share ``rate`` of the clips (escalate if score >= threshold); ``inf`` if it is 0."""
     k = int(np.floor(rate * len(scores) + 1e-9))
     return float("inf") if k == 0 else float(np.sort(scores)[::-1][k - 1])
 
 
 def rate_for_budget(budget_frac: float, c_l0: float, c_l1: float) -> float:
-    """Quota di escalation con costo medio = ``budget_frac`` · (C_L0 + C_L1), fra 0 e 1."""
+    """Escalation share whose mean cost is ``budget_frac`` · (C_L0 + C_L1), between 0 and 1."""
     rate = (budget_frac * (c_l0 + c_l1) - c_l0) / c_l1
     return float(np.clip(rate, 0.0, 1.0))
 
 
 def threshold_for_budget(scores: np.ndarray, budget_frac: float, c_l0: float, c_l1: float) -> float:
-    """Soglia con costo medio ≤ ``budget_frac`` · costo di always_L1 (= C_L0 + C_L1)."""
+    """Threshold with mean cost ≤ ``budget_frac`` · the cost of always_L1 (= C_L0 + C_L1)."""
     return threshold_at_rate(scores, rate_for_budget(budget_frac, c_l0, c_l1))

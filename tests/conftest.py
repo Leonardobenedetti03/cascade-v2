@@ -1,4 +1,4 @@
-"""Fixture comuni: run_dir temporanea e dataset sintetico piccolo (CPU, pochi secondi)."""
+"""Shared fixtures: a temporary run_dir and a small synthetic dataset (CPU, a few seconds)."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def make_ctx(root, name="test_stage", extra=(), synthetic=True):
 @pytest.fixture(scope="session")
 def syn_root(tmp_path_factory):
     root = tmp_path_factory.mktemp("dl4cv")
-    make_ctx(root)  # genera il dataset una volta per sessione
+    make_ctx(root)  # create the dataset once per session
     return root
 
 

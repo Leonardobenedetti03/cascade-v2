@@ -1,4 +1,4 @@
-# Opzionale: pre-commit install (non tocca submodule né src/cascade/models/vendor)
+# Optional: pre-commit install (it leaves the submodules and src/cascade/models/vendor alone)
 repos:
   - repo: https://github.com/psf/black
     rev: 24.10.0

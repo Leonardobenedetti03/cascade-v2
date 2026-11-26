@@ -1,9 +1,9 @@
-"""Dati del gate v2 da una run completa di scenario_preds (fino a ``feat-camformer`` e ``feat-egovlp``).
+"""Inputs of the gate v2, read from a complete scenario_preds run (up to ``feat-camformer`` and ``feat-egovlp``).
 
-Si usano le embedding congelate, non le predizioni: le teste lineari si rifanno dentro la CV annidata.
-Servono ``index/takes.csv``, ``features/camformer.npz``, ``features/egovlp.npz``, ``configs/heads.json`` e,
-per il moto, ``traj/<take>.npz``. Il file ``sealed/`` non si legge: le etichette del test vengono
-dall'indice, che le contiene comunque (il test ufficiale del 17/11 è già stato valutato, N34).
+We use the frozen embeddings, not the predictions: the linear heads are refit inside the nested CV.
+We need ``index/takes.csv``, ``features/camformer.npz``, ``features/egovlp.npz``, ``configs/heads.json``
+and, for motion, ``traj/<take>.npz``. We never read ``sealed/``. The test labels come from the index,
+which has them anyway (the official test was already evaluated once on 17/11, N34).
 """
 
 from __future__ import annotations
@@ -26,12 +26,12 @@ REQUIRED = ("take_name", "label", "session", "split", "duration_s")
 
 @dataclass
 class ScenarioData:
-    """Una riga per take nelle classi della testa, con embedding di EgoVLP."""
+    """One row per take in the head's classes, with an EgoVLP embedding."""
 
     takes: pd.DataFrame  # take_name, take_uid, label, label_idx, session, site, split, camformer_pretrain
-    X_cam: np.ndarray  # [N, D0], righe NaN = take senza embedding CamFormer (vanno a EgoVLP)
+    X_cam: np.ndarray  # [N, D0], NaN rows = takes without a CamFormer embedding (they go to EgoVLP)
     X_vid: np.ndarray  # [N, D1]
-    motion: np.ndarray  # [N, len(MOTION_FEATURES)], NaN se manca la traiettoria
+    motion: np.ndarray  # [N, len(MOTION_FEATURES)], NaN when the trajectory is missing
     classes: List[str]
     procedural: np.ndarray  # [C] bool
     n_windows: int
@@ -109,11 +109,11 @@ def load_scenario_run(
 
 
 def subset_masks(takes: pd.DataFrame, names: List[str]) -> Dict[str, np.ndarray]:
-    """Sottoinsiemi della valutazione (definiti senza label né EgoVLP).
+    """Evaluation subsets, defined without labels and without EgoVLP.
 
-    ``pretrain_unseen``: take che il pre-addestramento di CamFormer non ha usato per i gradienti
-    (``camformer_pretrain`` diverso da ``train``); ``official_eval``: val + test ufficiali (285 take in
-    official_v2); ``official_<split>``: un solo split ufficiale."""
+    ``pretrain_unseen``: takes whose gradients were not used to pre-train CamFormer (``camformer_pretrain``
+    is not ``train``). ``official_eval``: the official val and test splits (285 takes in official_v2).
+    ``official_<split>``: a single official split."""
     pre = takes.camformer_pretrain.astype(str).str.lower().to_numpy()
     split = takes.split.astype(str).str.lower().to_numpy()
     out: Dict[str, np.ndarray] = {}

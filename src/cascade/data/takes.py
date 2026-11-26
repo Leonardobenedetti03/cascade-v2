@@ -1,8 +1,9 @@
-"""Indice delle take (stadio ``index``): una riga per take con etichetta, split, fold e percorsi.
+"""Take index (stage ``index``): one row per take with label, split, fold and paths.
 
-Sorgente: gli ``split_manifest.csv`` delle due metà del subset. Le colonne comuni sono ``take_uid``,
-``take_name``, ``split``, ``scenario``, ``camera_pose_file``; nella metà procedurale ``scenario`` è il
-compito specifico (es. "Cooking an Omelet") e va ricondotto allo scenario (:func:`scenario_of`).
+Source: the ``split_manifest.csv`` files of the two halves of our subset. The shared columns are
+``take_uid``, ``take_name``, ``split``, ``scenario`` and ``camera_pose_file``. In the procedural half,
+``scenario`` is the specific task (e.g. "Cooking an Omelet"), which we map back to the scenario
+(:func:`scenario_of`).
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ DIRECT = {
 
 
 def scenario_of(raw: str) -> str:
-    """Scenario Ego-Exo4D (8 classi) dal valore della colonna ``scenario`` del manifest."""
+    """Ego-Exo4D scenario (8 classes) from the value of the ``scenario`` column of the manifest."""
     raw = str(raw).strip()
     if raw in DIRECT:
         return DIRECT[raw]
@@ -47,12 +48,12 @@ def scenario_of(raw: str) -> str:
 
 
 def site_of(take_name: str) -> str:
-    """Sito = prefisso del nome della take (cmu_, iiith_, uniandes_, ...)."""
+    """Site = prefix of the take name (cmu_, iiith_, uniandes_, ...)."""
     return take_name.split("_", 1)[0].lower()
 
 
 def session_of(take_name: str) -> str:
-    """Sessione = nome della take senza l'ultimo suffisso: take della stessa sessione restano insieme."""
+    """Session = take name without its last suffix, so takes of the same session stay together."""
     return take_name.rsplit("_", 1)[0]
 
 
@@ -84,7 +85,7 @@ def find_video(root: str, take_name: str, video_glob: str) -> Optional[str]:
 
 
 def probe_video(path: str):
-    """(numero di frame, fps) dall'header del video con PyAV."""
+    """(number of frames, fps) from the video header, with PyAV."""
     import av
 
     with av.open(path) as c:
@@ -97,11 +98,11 @@ def probe_video(path: str):
 
 
 def pretrain_takes(repo: Optional[Path]) -> Dict[str, str]:
-    """take_name -> 'train' / 'val' se la take compare nei dati di pretraining di CamFormer."""
+    """take_name -> 'train' / 'val' if the take is in CamFormer's pre-training data."""
     out: Dict[str, str] = {}
     if repo is None:
         return out
-    for split in ("val", "train"):  # train vince: è quello che conta per il leakage
+    for split in ("val", "train"):  # train wins: it is the one that matters for leakage
         f = Path(repo) / "data_files" / "egoexo4d" / f"{split}_v2.csv"
         if not f.is_file():
             log.warning("non trovo %s: colonna camformer_pretrain vuota", f)
@@ -112,13 +113,13 @@ def pretrain_takes(repo: Optional[Path]) -> Dict[str, str]:
 
 
 def cut_official_val(val: pd.DataFrame, vcfg: dict) -> np.ndarray:
-    """Divide la val ufficiale in ``val`` e ``test``: per sessione, stratificato per classe.
+    """Split the official val into ``val`` and ``test``, by session and stratified by class.
 
-    ``mode``: ``undecided`` (tutto ``val``; lo stadio heads si rifiuta di girare), ``split``
-    (quota ``test_frac`` al test), ``all_test`` (tutta la val ufficiale diventa test; il gate si
-    calibra sulle predizioni fuori campione del train), ``all_val``. Con ``split``, per ogni classe
-    (classe di maggioranza della sessione) le sessioni si mescolano con ``seed`` e si aggiungono al
-    test se avvicinano la quota; una classe con almeno 2 sessioni ne ha almeno una per parte.
+    ``mode``: ``undecided`` (everything stays ``val`` and the heads stage refuses to run), ``split`` (a share
+    ``test_frac`` goes to test), ``all_test`` (the whole official val becomes test, and the gate is calibrated on
+    the out-of-sample predictions of train), ``all_val``. With ``split``, for each class (the majority class of
+    the session) we shuffle the sessions with ``seed`` and add one to test when it brings us closer to the share.
+    A class with at least 2 sessions gets at least one on each side.
     """
     mode = vcfg["mode"]
     if mode in ("undecided", "all_val"):
@@ -153,9 +154,9 @@ def cut_official_val(val: pd.DataFrame, vcfg: dict) -> np.ndarray:
 
 
 def assign_split_and_folds(df: pd.DataFrame, scfg: dict) -> pd.DataFrame:
-    """Colonne ``split`` (train / val / test), ``fold_s<seed>`` per ogni seed e ``fold`` (= primo seed).
+    """Columns ``split`` (train / val / test), ``fold_s<seed>`` for each seed, and ``fold`` (= the first seed).
 
-    Le fold valgono 0..K-1 sul train e -1 altrove. Con ``mode: site`` le fold sono i siti, uguali per tutti i seed.
+    Folds are 0..K-1 on train and -1 elsewhere. With ``mode: site`` the folds are the sites, the same for every seed.
     """
     df = df.copy()
     seeds = list(scfg["fold_seeds"])
@@ -193,7 +194,7 @@ def assign_split_and_folds(df: pd.DataFrame, scfg: dict) -> pd.DataFrame:
 
 
 def official_folds(train: pd.DataFrame, n_folds: int, seed: int) -> np.ndarray:
-    """StratifiedGroupKFold per sessione sulle take con classe nella testa; le altre a rotazione."""
+    """StratifiedGroupKFold by session on the takes whose class is in the head; the others in round robin."""
     from sklearn.model_selection import StratifiedGroupKFold
 
     fold = np.full(len(train), -1, dtype=int)
@@ -237,7 +238,7 @@ def build_index(cfg: dict, camformer_repo: Optional[Path]) -> pd.DataFrame:
             continue
         try:
             n, f = probe_video(v)
-        except Exception as e:  # noqa: BLE001 - un video rotto non ferma l'indice
+        except Exception as e:  # noqa: BLE001 - a broken video does not stop the index
             log.warning("%s: video illeggibile (%s)", r.take_name, e)
             n, f = 0, np.nan
         n_frames.append(n)
@@ -254,8 +255,8 @@ def build_index(cfg: dict, camformer_repo: Optional[Path]) -> pd.DataFrame:
 
 
 def summary(df: pd.DataFrame, window_s: float) -> dict:
-    """Conteggi per decidere e controllare (non sono risultati): take e sessioni per split e classe,
-    composizione della val ufficiale, sessioni condivise tra train e val/test."""
+    """Counts used to decide and to check (they are not results): takes and sessions per split and class,
+    composition of the official val, sessions shared between train and val/test."""
 
     def per_class(d: pd.DataFrame) -> dict:
         return {c: {"takes": int(len(x)), "sessions": int(x.session.nunique())} for c, x in d.groupby("label")}

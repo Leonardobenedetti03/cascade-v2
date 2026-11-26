@@ -1,9 +1,9 @@
-"""Decodifica e preprocessing dei frame per EgoVLP (da ``frames.py`` di cascade v2).
+"""Frame decoding and preprocessing for EgoVLP (from ``frames.py`` in cascade v2).
 
-Istanti: punti medi di ``n_frames`` segmenti uguali della finestra (campionamento ``uniform`` di test
-di EgoVLP); al modello vanno solo ``frame_indices`` (4 dei 16), quindi si decodificano solo quelli.
-Preprocessing di test di EgoVLP: Resize(256) sul lato corto (bicubico con antialias, come il
-ridimensionamento ffmpeg dei loro video), CenterCrop(256), Resize(224) senza antialias (torchvision 0.13).
+Time points: the midpoints of ``n_frames`` equal segments of the window (EgoVLP's ``uniform`` test sampling).
+Only ``frame_indices`` (4 of the 16) go to the model, so we decode only those.
+EgoVLP's test preprocessing: Resize(256) on the short side (bicubic with antialias, like the ffmpeg resize of
+their videos), CenterCrop(256), Resize(224) without antialias (torchvision 0.13).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ def frame_times(t_start: float, t_end: float, n: int) -> np.ndarray:
 
 
 def decode_at(path: str, times: Sequence[float]) -> np.ndarray:
-    """Frame RGB uint8 ``[len(times), H, W, 3]`` ai tempi dati (frame più vicino); decord se c'è, altrimenti PyAV."""
+    """RGB uint8 frames ``[len(times), H, W, 3]`` at the given times (nearest frame); decord if present, else PyAV."""
     try:
         import decord
 
@@ -41,7 +41,7 @@ def _decode_pyav(path: str, times: Sequence[float]) -> np.ndarray:
         fps = float(s.average_rate)
         tb = float(s.time_base)
         for t in times:
-            target = int(round(t * fps))  # indice del frame voluto
+            target = int(round(t * fps))  # index of the frame we want
             c.seek(int(max(t - 1.0, 0) / tb), stream=s, backward=True, any_frame=False)
             last = None
             for fr in c.decode(s):

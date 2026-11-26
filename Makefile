@@ -1,14 +1,14 @@
-# Comandi di sviluppo. Python dell'ambiente attivo (es. ~/envs/dl4cv).
+# Development commands. They use the Python of the active environment (e.g. .venv).
 PY ?= python3
 
 .PHONY: help test cov lint format clean
 
 help:
-	@echo "make test       - pytest (solo CPU, < 3 minuti)"
-	@echo "make cov        - pytest con copertura di src/"
+	@echo "make test       - pytest (CPU only, under 3 minutes)"
+	@echo "make cov        - pytest with coverage of src/"
 	@echo "make lint       - ruff + black --check"
 	@echo "make format     - black + ruff --fix"
-	@echo "make clean      - rimuove cache Python e la run sintetica locale"
+	@echo "make clean      - remove Python caches and the local synthetic run"
 
 test:
 	$(PY) -m pytest -q

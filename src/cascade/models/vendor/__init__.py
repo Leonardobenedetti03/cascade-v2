@@ -1,1 +1,1 @@
-"""Codice di terze parti copiato al minimo indispensabile, con attribuzione."""
+"""Third-party code, copied in the smallest amount we need and with its attribution."""

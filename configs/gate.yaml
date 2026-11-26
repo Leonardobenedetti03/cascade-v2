@@ -1,27 +1,28 @@
-# Gate e valutazione (sezione 6). Feature solo da L0 e dalla traiettoria.
-# Famiglie (blueprint 5.2): riferimenti, selettivi (thr_*), appresi su y (logreg_*, lgbm_*) e
-# compare_* (CompareConfidence, M06). Non ci sono ridge_*, lgbmreg_* e bayes_* (nota N16).
+# Gate v1 and its evaluation (first pipeline, now in the development history). The gate v2 of the report is
+# configured in gate_v2.yaml. Features only from L0 and the trajectory.
+# Families (blueprint 5.2): references, selective (thr_*), learned on y (logreg_*, lgbm_*) and
+# compare_* (CompareConfidence, M06). There are no ridge_*, lgbmreg_* or bayes_* (note N16).
 gate:
-  reliability_alpha: 1.0         # smoothing di Laplace della precisione per classe (feature B)
+  reliability_alpha: 1.0         # Laplace smoothing of the per-class precision (feature B)
   emb_pca_dim: 16
   models: [always_L0, always_L1, random, oracle,
            thr_maxprob, thr_margin, thr_entropy,
            logreg_A, logreg_AC, logreg_ABC, lgbm_ABC,
            compare_A, compare_AC]
-  # RQ2: il gate che usa la traiettoria predice quando servono i pixel meglio della sola
-  # confidenza di CamFormer, a parità di costo? Differenze A − B appaiate (stessi
-  # ricampionamenti per take) su area, accuratezza a budget e quota dell'oracolo.
-  # Le prime due coppie sono quelle di RQ2: compare_A contro thr_maxprob isola l'effetto di
-  # modellare l'esperto; compare_AC contro compare_A isola l'effetto della traiettoria (tra i
-  # due cambia solo il gruppo C). La terza ripete l'effetto della traiettoria nella famiglia y.
+  # RQ2: at the same cost, does a gate that uses the trajectory predict when pixels are needed better than
+  # CamFormer's confidence alone? Paired differences A − B (same resamples per take) on area, accuracy at
+  # budget and share of the oracle.
+  # The first two pairs are the RQ2 ones: compare_A against thr_maxprob isolates the effect of modelling the
+  # expert; compare_AC against compare_A isolates the effect of the trajectory (only group C changes between
+  # them). The third repeats the effect of the trajectory in the y family.
   comparisons:
     - [compare_A, thr_maxprob]
     - [compare_AC, compare_A]
     - [logreg_AC, logreg_A]
-  reference: []                  # gate per la cascata nelle tabelle per classe (vuoto = migliore su val)
+  reference: []                  # gate used for the cascade in the per-class tables (empty = best on val)
   logreg_Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
   logreg_inner_cv: 3
-  logreg_class_weight: balanced  # y = 1 è raro: pesi bilanciati (ablation: configs/ablations/gate_weights.yaml)
+  logreg_class_weight: balanced  # y = 1 is rare: balanced weights (ablation: configs/ablations/gate_weights.yaml, now archived)
   lgbm:
     num_leaves: 15
     min_child_samples: 20        # = min_data_in_leaf
@@ -32,26 +33,26 @@ gate:
     colsample_bytree: 0.8
     early_stopping_rounds: 30
     valid_frac: 0.2
-    deterministic: true          # risultati identici a parità di seed (e di thread)
+    deterministic: true          # identical results for the same seed (and number of threads)
     force_row_wise: true
-  random_seeds: 10               # seed mediati per il gate random
-  seeds: [0, 1, 2]               # seed per i gate stocastici (lgbm)
-  r_step: 1                      # quota di escalation r in %, da 0 a 100
-  budgets: [0.25, 0.5]           # frazioni del costo di always_L1
-  within_pts: 0.01               # "entro 1 punto da always_L1"
-  improvement_deltas: [0.0, 0.01]  # I(δ) = C_L1 / C(r*_δ): costo minimo per stare entro δ da always_L1
-  bacc_min_takes: 1              # accuratezza bilanciata: una classe esce solo con 0 take nello split (N28)
-  transfer_budgets: [0.25, 0.5]  # RQ1: soglia scelta su val per questi budget, applicata al test
-  operating_budget: 0.5          # punto di lavoro con operating_rule = budget
-  # Punto di lavoro scelto su val (N28): within_pts = quota di escalation minima con accuratezza su val
-  # >= accuratezza di always_L1 su val − within_pts; budget = costo <= operating_budget × costo di always_L1.
+  random_seeds: 10               # seeds averaged for the random gate
+  seeds: [0, 1, 2]               # seeds for the stochastic gates (lgbm)
+  r_step: 1                      # escalation share r in %, from 0 to 100
+  budgets: [0.25, 0.5]           # fractions of the cost of always_L1
+  within_pts: 0.01               # "within 1 point of always_L1"
+  improvement_deltas: [0.0, 0.01]  # I(δ) = C_L1 / C(r*_δ): lowest cost to stay within δ of always_L1
+  bacc_min_takes: 1              # balanced accuracy: a class leaves only with 0 takes in the split (N28)
+  transfer_budgets: [0.25, 0.5]  # RQ1: threshold chosen on val for these budgets, applied to test
+  operating_budget: 0.5          # operating point when operating_rule = budget
+  # Operating point chosen on val (N28): within_pts = smallest escalation share with accuracy on val
+  # >= accuracy of always_L1 on val − within_pts; budget = cost <= operating_budget × cost of always_L1.
   operating_rule: within_pts
   bootstrap: 1000
   bootstrap_seed: 0
-  # N37: unità del bootstrap e gruppi della CV interna dei gate (take | session). Default take = come la run
-  # scenario_v1 (N33, N34), che resta così riproducibile. La versione per sessione si attiva con --config
-  # configs/hpc/gate_v1_session.yaml; il gate v2 (stadio 56) lavora sempre per sessione.
+  # N37: bootstrap unit and groups of the gates' inner CV (take | session). The default, take, is the same as
+  # the scenario_v1 run (N33, N34), which stays reproducible this way. The per-session version was turned on
+  # with --config configs/hpc/gate_v1_session.yaml (now archived); the gate v2 (stage 56) always works by session.
   bootstrap_unit: take
   inner_cv_groups: take
-  # CompareConfidence (M06): P(c1 = 1 | z) con regressione logistica, senza pesi di classe
+  # CompareConfidence (M06): P(c1 = 1 | z) with logistic regression, no class weights
   compare: {Cs: [0.001, 0.01, 0.1, 1.0, 10.0], inner_cv: 3}

@@ -1,18 +1,17 @@
-"""Manifest degli stadi: marcatore di completamento e controllo di coerenza della config.
+"""Stage manifests: a completion marker plus a check that the config has not changed.
 
-Ogni stadio, quando ha scritto tutti i suoi output, scrive per ultimo
-``<run_dir>/_manifest/<stadio>[.<parte>].json`` con: config effettiva, chiavi di
-config che determinano l'output (``STAGE_KEYS``), elenco degli output, commit,
-versioni delle librerie, comando lanciato, seed. La ``parte`` distingue gli shard
-(``shard003of020``) e le fold (``fold2``).
+When a stage has written all its outputs, it writes ``<run_dir>/_manifest/<stage>[.<part>].json`` last. The
+file holds the effective config, the config keys that determine the output (``STAGE_KEYS``), the list of
+outputs, the commit, the library versions, the command line and the seed. ``part`` tells shards
+(``shard003of020``) and folds (``fold2``) apart.
 
-Regole:
-- uno stadio si salta solo se manifest **e** output esistono e la config attuale
-  coincide con quella del manifest sulle chiavi dello stadio; se differisce è un
-  errore (non si mescolano output di config diverse nella stessa run_dir);
-- output presenti senza manifest = esecuzione interrotta: si rifà;
-- uno stadio a valle verifica che gli stadi a monte siano completi (tutti gli shard,
-  tutte le fold) e coerenti con la config attuale sulle loro chiavi.
+Rules:
+- a stage is skipped only if the manifest **and** the outputs exist and the current config matches the
+  manifest on the stage keys. If it differs we stop, so outputs of different configs never end up in the
+  same run_dir;
+- outputs without a manifest mean the run was interrupted, so the stage runs again;
+- a downstream stage checks that the upstream stages are complete (all shards, all folds) and match the
+  current config on their keys.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ log = logging.getLogger(__name__)
 
 MANIFEST_DIR = "_manifest"
 
-# Chiavi di config (prefissi puntati) che determinano l'output di ciascuno stadio.
+# Config keys (dotted prefixes) that determine the output of each stage.
 STAGE_KEYS: Dict[str, List[str]] = {
     "00_inventory": [
         "paths.scenario_csv",
@@ -111,8 +110,8 @@ STAGE_KEYS: Dict[str, List[str]] = {
     "52_seeds": ["gate", "fusion.mode"],
 }
 
-# [M07] Un cambio di split o di fold deve invalidare tutto ciò che ne dipende. Senza queste chiavi
-# is_done() considera "già fatto" uno stadio a valle calcolato con fold vecchie e lo salta.
+# [M07] A change of split or folds must invalidate everything that depends on it. Without these keys,
+# is_done() would treat a downstream stage computed on the old folds as "already done" and skip it.
 SPLIT_KEYS = ["paths.scenario_csv", "paths.split_sha256", "folds"]
 SPLIT_DEPENDENT_STAGES = (
     "20_camformer",
@@ -126,12 +125,12 @@ SPLIT_DEPENDENT_STAGES = (
 for _stage in SPLIT_DEPENDENT_STAGES:
     STAGE_KEYS[_stage] = STAGE_KEYS[_stage] + [k for k in SPLIT_KEYS if k not in STAGE_KEYS[_stage]]
 
-# [I2] Stesso difetto per la definizione delle clip: rifare lo stadio 00 con un'altra finestra, durata o sorgente
-# delle traiettorie deve invalidare frame, feature, predizioni e cache. Lo stadio 00 prende anche l'hash dello
-# split (un CSV cambiato a parità di nome cambia clips.csv) e il 41 ha finalmente le sue chiavi.
+# [I2] Same problem for the clip definition: rerunning stage 00 with another window, duration or trajectory
+# source must invalidate frames, features, predictions and caches. Stage 00 also takes the hash of the split
+# (a changed CSV with the same name changes clips.csv), and stage 41 now has its own keys.
 STAGE_KEYS["00_inventory"].append("paths.split_sha256")
-# N37: senza chiavi il manifest dello stadio 56 non registrava la config e una run con gate_v2 cambiato
-# risultava "già completata". Il percorso della run di scenario_preds è nell'extra del manifest.
+# N37: without keys, the manifest of stage 56 did not record the config, and a run with a changed gate_v2
+# looked "already complete". The path of the scenario_preds run is in the manifest's extra field.
 STAGE_KEYS["56_gate_v2"] = ["gate_v2", "data.vertical_axis"]
 STAGE_KEYS["41_cost_e2e"] = [
     "cost_e2e",
@@ -161,7 +160,7 @@ for _stage in CLIP_DEPENDENT_STAGES:
 
 
 class ConfigMismatch(RuntimeError):
-    """Output esistenti prodotti con una config diversa da quella attuale."""
+    """Existing outputs that were produced with a config different from the current one."""
 
 
 def _get(d: dict, dotted: str):
@@ -247,7 +246,7 @@ def check_keys(stage: str, manifest: dict, cfg_dict: dict, *, ignore: Sequence[s
 
 
 def is_done(run_dir: Path, stage: str, cfg_dict: dict, outputs: Iterable[Path], *, part: Optional[str] = None) -> bool:
-    """True se lo stadio (o la parte) è completo e coerente con la config attuale."""
+    """True if the stage (or the part) is complete and matches the current config."""
     m = read_manifest(run_dir, stage, part)
     outs = list(outputs)
     if m is None:
@@ -276,10 +275,10 @@ def require_stage(
     sharded: bool = False,
     ignore: Sequence[str] = (),
 ) -> List[dict]:
-    """Verifica che uno stadio a monte sia completo e coerente; restituisce i manifest.
+    """Check that an upstream stage is complete and consistent, and return its manifests.
 
-    ``parts``: parti attese (es. le fold); ``sharded``: tutte le parti ``shardXXXofNNN``
-    con lo stesso NNN devono esserci.
+    ``parts``: the expected parts (e.g. the folds). ``sharded``: all the parts ``shardXXXofNNN`` with the same
+    NNN must be present.
     """
     mdir = run_dir / MANIFEST_DIR
     if sharded:
@@ -322,9 +321,9 @@ def require_stage(
 
 
 def build_run_manifest(run_dir: Path) -> dict:
-    """Riepilogo della run da tutti i manifest degli stadi: per ogni stadio e parte, commit,
-    comando, seed, versioni delle librerie, chiavi di config e output. Va in
-    ``<run_dir>/run_manifest.json`` (scritto dallo stadio 55 e da ``60_make_report.sh``)."""
+    """Summary of the run from the manifests of all stages: for each stage and part, the commit, the command,
+    the seed, the library versions, the config keys and the outputs. It goes to ``<run_dir>/run_manifest.json``
+    (written by stage 55 and by ``60_make_report.sh``)."""
     mdir = Path(run_dir) / MANIFEST_DIR
     stages: Dict[str, dict] = {}
     commits, versions = set(), {}
@@ -355,5 +354,5 @@ def write_run_manifest(run_dir: Path) -> Path:
     return p
 
 
-if __name__ == "__main__":  # python -m src.cascade.manifest <run_dir>
+if __name__ == "__main__":  # python -m src.cascade.utils.manifest <run_dir>
     print(write_run_manifest(Path(sys.argv[1])))

@@ -1,17 +1,18 @@
 #!/bin/bash
-# hpc/features_submit.sh - sottomette la catena in 3 job (la QOS stud ne ammette 4 in coda):
+# hpc/features_submit.sh - submits the feature chain as 3 jobs (the stud QOS allows 4 in the queue):
 #   A (CPU)  index -> traj
-#   B (GPU)  feat-camformer -> feat-egovlp       dopo A
-#   C (CPU)  heads                                dopo B; esce con codice 3 se il controllo pre-registrato fallisce
-# Uso:  RUN_NAME=official_v1 hpc/features_submit.sh
-# Taglio (official_val.mode = split, metà val e metà test) e controllo (val: bacc >= 0,40 e CI sopra il caso; train OOF:
-# richiamo > 0; tutte le classi presenti) sono i default fissati nel registro. Prima: hpc/input_variants.sh sceglie sulla val
-# pose e finestre; poi questa catena con le due --set stampate da select (in select/selection.json):
-#   RUN_NAME=official_v2 hpc/features_submit.sh --set 'poses.json_cam_to_device=[[1,0,0],[0,1,0],[0,0,1]]' --set 'window.n_windows=1'
-# se l'indice esiste già con un altro taglio,
-# rifarlo prima a mano:  python scripts/01_extract_features.py index --overwrite --set ...  (le feature non si rifanno).
-# Analisi secondaria per sito: RUN_NAME=site_v1 hpc/features_submit.sh --set split.mode=site --skip-check
-# Gli stadi già completi con la stessa config si saltano: rilanciare dopo un errore è sicuro.
+#   B (GPU)  feat-camformer -> feat-egovlp       after A
+#   C (CPU)  heads                                after B; exits with code 3 if the pre-registered check fails
+# Usage:  RUN_NAME=official_v1 hpc/features_submit.sh
+# The cut (official_val.mode = split, half val and half test) and the check (val: bacc >= 0.40 and CI above chance;
+# OOF train: recall > 0; all classes present) are the defaults fixed in the decision log. First hpc/input_variants.sh
+# picks poses and windows on val; then this chain runs with the two --set printed by select (in select/selection.json).
+# This is how we made the run in the report:
+#   RUN_NAME=official_v2 hpc/features_submit.sh --set 'poses.json_cam_to_device=[[1,0,0],[0,1,0],[0,0,1]]' --set 'window.n_windows=5'
+# If the index already exists with a different cut, redo it by hand first:
+#   python scripts/01_extract_features.py index --overwrite --set ...  (the features are not recomputed).
+# Secondary analysis by site: RUN_NAME=site_v1 hpc/features_submit.sh --set split.mode=site --skip-check
+# Stages already complete with the same config are skipped, so rerunning after an error is safe.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source hpc/features_env.sh

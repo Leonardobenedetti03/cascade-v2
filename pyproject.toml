@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cascade"
 version = "0.2.0"
-description = "DL4CV: cascata a costo variabile CamFormer -> TimeSformer-EgoVLP su Ego-Exo4D"
+description = "DL4CV: a variable-cost cascade CamFormer -> TimeSformer-EgoVLP on Ego-Exo4D"
 requires-python = ">=3.9"
 
 [project.optional-dependencies]
@@ -49,17 +49,17 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# pyflakes, pycodestyle, import ordinati, bugbear, pyupgrade (fermo a 3.9: niente "X | Y")
+# pyflakes, pycodestyle, sorted imports, bugbear, pyupgrade (stopped at 3.9: no "X | Y")
 select = ["E", "F", "W", "I", "B", "UP"]
 ignore = [
-  "E501",   # righe lunghe: ci pensa black (stringhe e commenti possono superare)
-  "B905",   # zip(strict=) non esiste in 3.9
+  "E501",   # long lines: black handles them (strings and comments may go over)
+  "B905",   # zip(strict=) does not exist in 3.9
   "B008",
-  "UP006", "UP007", "UP035", "UP045",  # typing.List/Optional restano: dataclass valutate a runtime su 3.9
+  "UP006", "UP007", "UP035", "UP045",  # we keep typing.List/Optional: dataclasses are evaluated at runtime on 3.9
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/*.py" = ["E402"]     # sys.path prima degli import di src
+"scripts/*.py" = ["E402"]     # sys.path before the src imports
 "tests/*.py" = ["E402", "B011"]
 
 [tool.ruff.lint.isort]

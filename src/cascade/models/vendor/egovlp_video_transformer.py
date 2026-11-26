@@ -1,18 +1,17 @@
-"""Copia minima di ``EgoVLP/model/video_transformer.py`` (SpaceTimeTransformer).
+"""Minimal copy of ``EgoVLP/model/video_transformer.py`` (SpaceTimeTransformer).
 
-Fonte: https://github.com/showlab/EgoVLP (commit del submodule in third_party/EgoVLP),
-che a sua volta deriva da Frozen in Time (Max Bain) e da timm (Ross Wightman).
-Licenza e copyright degli autori originali.
+Source: https://github.com/showlab/EgoVLP (the submodule commit in third_party/EgoVLP), which in turn comes
+from Frozen in Time (Max Bain) and timm (Ross Wightman). Licence and copyright belong to the original authors.
 
-Modifiche rispetto all'originale (nessuna al calcolo):
-- ``DropPath``, ``to_2tuple``, ``trunc_normal_`` reimplementati qui invece di
-  ``from timm.models.layers import ...`` (API deprecata nelle versioni recenti di timm);
-- rimosso il ``print`` dello stile di attenzione nel costruttore;
-- ``q *= self.scale`` → ``q = q * self.scale`` (stesso valore; l'in-place su una view
-  impedisce il tracing di fvcore con torch recenti);
-- gradient checkpointing opzionale dei blocchi in ``forward_features`` (attributo
-  ``grad_checkpointing``, solo in training; stessi valori, meno memoria) per il fine-tuning.
-Il submodule non viene modificato.
+What we changed (nothing in the computation):
+- ``DropPath``, ``to_2tuple`` and ``trunc_normal_`` are written here instead of
+  ``from timm.models.layers import ...`` (an API that recent timm versions deprecate);
+- we removed the ``print`` of the attention style in the constructor;
+- ``q *= self.scale`` → ``q = q * self.scale`` (same value; the in-place op on a view breaks fvcore tracing
+  with recent torch versions);
+- optional gradient checkpointing of the blocks in ``forward_features`` (attribute ``grad_checkpointing``,
+  training only; same values, less memory), for fine-tuning.
+The submodule itself is not modified.
 """
 
 import collections.abc
@@ -35,7 +34,7 @@ def trunc_normal_(tensor, mean=0.0, std=1.0, a=-2.0, b=2.0):
 
 
 class DropPath(nn.Module):
-    """Stochastic depth per campione (come timm.layers.DropPath)."""
+    """Per-sample stochastic depth (like timm.layers.DropPath)."""
 
     def __init__(self, drop_prob=0.0):
         super().__init__()
@@ -127,7 +126,7 @@ class VarAttention(nn.Module):
         q, k, v = self.qkv(x).chunk(3, dim=-1)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
 
-        q = q * self.scale  # originale: q *= self.scale (in-place, non tracciabile da fvcore)
+        q = q * self.scale  # original: q *= self.scale (in-place, fvcore cannot trace it)
 
         # splice out CLS token at index 1
         (cls_q, q_), (cls_k, k_), (cls_v, v_) = map(lambda t: (t[:, 0:1], t[:, 1:]), (q, k, v))
@@ -347,7 +346,7 @@ class SpaceTimeTransformer(nn.Module):
 
         for blk in self.blocks:
             if getattr(self, "grad_checkpointing", False) and self.training:
-                # aggiunta (fase D): ricalcola le attivazioni nel backward per risparmiare memoria
+                # added by us: recompute the activations in the backward pass to save memory
                 from torch.utils.checkpoint import checkpoint
 
                 x = checkpoint(blk, x, self.einops_from_space, self.einops_to_space, self.einops_from_time,

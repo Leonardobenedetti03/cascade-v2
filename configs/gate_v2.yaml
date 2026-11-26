@@ -1,43 +1,44 @@
-# Gate v2 (N37, stadio 56): CV annidata per sessione su tutte le take di scenario_preds.
-# Tutti i valori qui sotto vanno fissati nel registro (N37) PRIMA della run: dopo non si cambiano.
+# Gate v2 (N37, stage 56): nested CV by session on all the scenario_preds takes.
+# All the values below were fixed in the decision log (N37) BEFORE the run, and not changed afterwards.
+# The run in the report adds configs/gate_v2_n38_cal.yaml on top of this file.
 gate_v2:
-  outer_folds: 5          # livello 3: ogni take è valutata da modelli che non hanno visto la sua sessione
-  inner_folds: 5          # livello 1: predizioni fuori campione di CamFormer su cui si addestra il gate
-  gate_folds: 5           # livello 2: cross-fitting di gate, calibratore e soglie
-  repeats: [0, 1, 2]      # partizioni esterne diverse; decisioni mediate per take
-  outer_l0: refit         # refit | inner_mean (allineamento con le predizioni su cui si addestra il gate)
-  heads:                  # come la testa di official_v2 (scenario_preds/configs/default.yaml)
+  outer_folds: 5          # level 3: each take is evaluated by models that have not seen its session
+  inner_folds: 5          # level 1: out-of-sample CamFormer predictions the gate is trained on
+  gate_folds: 5           # level 2: cross-fitting of gate, calibrator and thresholds
+  repeats: [0, 1, 2]      # different outer partitions; decisions averaged per take
+  outer_l0: refit         # refit | inner_mean (aligned with the predictions the gate is trained on)
+  heads:                  # as in the official_v2 head (scenario_preds/configs/default.yaml, now configs/features.yaml)
     Cs: [0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
     inner_cv: 3
     max_iter: 3000
     class_weight: balanced
-  scorers: [thr_maxprob, logreg_A, logreg_AC, logreg_ABC, lgbm_ABC, class_rule]  # lgbm_ABC: secondario (continuità con la v1), fuori dai confronti
+  scorers: [thr_maxprob, logreg_A, logreg_AC, logreg_ABC, lgbm_ABC, class_rule]  # lgbm_ABC: secondary (continuity with v1), not in the comparisons
   primary_scorer: thr_maxprob
   logreg_Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
   logreg_inner_cv: 3
   reliability_alpha: 1.0
-  reliability_folds: 5     # N38: affidabilità delle righe di fit fuori fold per sessione (correzione dell'errore 1)
-  calibration_population: all  # N38: all = come la run 772601; pretrain_unseen = configs/gate_v2_n38_cal.yaml
+  reliability_folds: 5     # N38: reliability of the fit rows computed out of fold by session (fix of error 1)
+  calibration_population: all  # N38: all = as in run 772601; pretrain_unseen = configs/gate_v2_n38_cal.yaml
   calibration_min_errors: 10
   calibration: platt      # platt | isotonic
-  calibration_boot: 200   # bootstrap per sessione del calibratore (r_up)
-  delta: 0.1              # r_up = quantile 90%; garanzia della regola a rischio al 90%
-  betas: [0.01, 0.02, 0.05, 0.10, 0.20]  # regola a costo: 100, 50, 20, 10, 5 chiamate a EgoVLP per errore evitato
-  alphas: [0.02, 0.05, 0.10]          # regola a rischio: errore massimo tra le take lasciate a CamFormer
-  risk_grid: 20                       # coperture candidate (Bonferroni su 20)
-  max_error_rates: [0.01]             # come within_pts della v1 (riferimento)
+  calibration_boot: 200   # session bootstrap of the calibrator (r_up)
+  delta: 0.1              # r_up = 90% quantile; the risk rule's guarantee holds at 90%
+  betas: [0.01, 0.02, 0.05, 0.10, 0.20]  # cost rule: 100, 50, 20, 10, 5 EgoVLP calls per error avoided
+  alphas: [0.02, 0.05, 0.10]          # risk rule: maximum error among the takes left to CamFormer
+  risk_grid: 20                       # candidate coverages (Bonferroni over 20)
+  max_error_rates: [0.01]             # like within_pts in v1 (a reference)
   budgets: [0.1, 0.2, 0.3]
   primary_rule: cost
-  primary_param: 0.05    # solo il punto del sommario: il risultato è la curva su tutti i β (N37)
+  primary_param: 0.05    # only the summary point: the result is the curve over all β (N37)
   subsets: [all, pretrain_unseen, pretrain_seen, official_eval]
-  primary_subset: pretrain_unseen     # take non viste dal pre-addestramento di CamFormer
-  comparisons:                        # coppie pre-registrate A − B, correzione di Holm
-    - [logreg_A, thr_maxprob]         # un gate appreso sulla confidenza batte la soglia?
-    - [logreg_AC, logreg_A]           # effetto del moto
-    - [logreg_ABC, logreg_AC]         # effetto dell'affidabilità per classe
-    - [thr_maxprob, class_rule]       # decisione per take contro regola per classe
+  primary_subset: pretrain_unseen     # takes not seen in CamFormer's pre-training
+  comparisons:                        # pre-registered pairs A − B, Holm correction
+    - [logreg_A, thr_maxprob]         # does a gate learned on the confidence beat the threshold?
+    - [logreg_AC, logreg_A]           # effect of motion
+    - [logreg_ABC, logreg_AC]         # effect of the per-class reliability
+    - [thr_maxprob, class_rule]       # per-take decision against per-class rule
   bootstrap: 1000
   bootstrap_seed: 0
-  gmacs_per_window: {L0: 0.121627, L1: 92.430496}   # stadio 40 di scenario_v1 (operating_point.csv / 5 finestre)
-  extra_gmacs_L0: [0.0]   # sensibilità: costo della traiettoria per finestra (da misurare)
-  extra_gmacs_L1: [0.0]   # sensibilità: decodifica dei frame per finestra (da misurare)
+  gmacs_per_window: {L0: 0.121627, L1: 92.430496}   # stage 40 of scenario_v1 (operating_point.csv / 5 windows)
+  extra_gmacs_L0: [0.0]   # sensitivity: trajectory cost per window (not measured)
+  extra_gmacs_L1: [0.0]   # sensitivity: frame decoding cost per window (not measured)

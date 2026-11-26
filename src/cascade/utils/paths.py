@@ -1,10 +1,10 @@
-"""Risoluzione dei percorsi: radice unica ``DL4CV_ROOT`` con override opzionali.
+"""Path resolution: one root, ``DL4CV_ROOT``, with optional overrides.
 
-- dati: ``$CASCADE_DATA_ROOT`` se impostata, altrimenti ``$DL4CV_ROOT/data``;
-- run:  ``$CASCADE_RUN_ROOT`` se impostata, altrimenti ``$DL4CV_ROOT/runs``.
+- data: ``$CASCADE_DATA_ROOT`` if set, otherwise ``$DL4CV_ROOT/data``;
+- runs: ``$CASCADE_RUN_ROOT`` if set, otherwise ``$DL4CV_ROOT/runs``.
 
-Nei YAML i percorsi sono template con i segnaposto ``{repo}``, ``{data}``, ``{run}``
-(e altri campi passati a :func:`resolve`): nessun percorso assoluto nel codice.
+In the YAML files, paths are templates with the placeholders ``{repo}``, ``{data}``, ``{run}`` (and any other
+field passed to :func:`resolve`), so there are no absolute paths in the code.
 """
 
 from __future__ import annotations
@@ -27,29 +27,29 @@ def _env_dir(var: str) -> Optional[Path]:
 
 
 def data_root() -> Path:
-    """Radice dei dati."""
+    """Data root."""
     override = _env_dir(DATA_ENV)
     return override if override is not None else dl4cv_root() / "data"
 
 
 def run_root() -> Path:
-    """Radice delle run."""
+    """Runs root."""
     override = _env_dir(RUN_ENV)
     return override if override is not None else dl4cv_root() / "runs"
 
 
 def run_dir(run_name: str) -> Path:
-    """``<run_root>/<run_name>``; il nome non può contenere separatori."""
+    """``<run_root>/<run_name>``; the name cannot contain path separators."""
     if not run_name or "/" in run_name or run_name in {".", ".."}:
         raise ValueError(f"run_name non valido: {run_name!r}")
     return run_root() / run_name
 
 
 def resolve(template: str, *, data: Optional[Path] = None, run: Optional[Path] = None, **fields: object) -> Path:
-    """Espande un template di percorso.
+    """Expand a path template.
 
-    ``{repo}`` è la radice del repo, ``{data}`` la radice dei dati (o ``data``),
-    ``{run}`` la run_dir. Un template senza segnaposto è relativo alla radice dei dati.
+    ``{repo}`` is the repository root, ``{data}`` the data root (or ``data``), ``{run}`` the run_dir.
+    A template without placeholders is relative to the data root.
     """
     values = {"repo": str(REPO_ROOT), **{k: str(v) for k, v in fields.items()}}
     if "{data}" in template or not any(t in template for t in ("{repo}", "{run}")):

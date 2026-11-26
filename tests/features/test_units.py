@@ -36,7 +36,7 @@ def test_windows():
 def test_extrinsics_inversion():
     R = Rotation.random(5, random_state=0).as_matrix()
     c = np.random.default_rng(0).normal(size=(5, 3))
-    t = -np.einsum("nij,nj->ni", R, c)  # mondo -> camera: t = -R c
+    t = -np.einsum("nij,nj->ni", R, c)  # world -> camera: t = -R c
     centre, q = extrinsics_to_c2w(np.concatenate([R, t[:, :, None]], 2))
     assert np.allclose(centre, c)
     assert np.allclose(Rotation.from_quat(q).as_matrix(), np.transpose(R, (0, 2, 1)))
@@ -50,7 +50,7 @@ def _traj(R, c, fps=20.0, src="x"):
 def test_estimate_frame_recovers_rotations():
     rng = np.random.default_rng(1)
     n = 600
-    rv = np.cumsum(rng.normal(scale=0.05, size=(n, 3)), axis=0)  # moto rotazionale casuale
+    rv = np.cumsum(rng.normal(scale=0.05, size=(n, 3)), axis=0)  # random rotational motion
     Rc = Rotation.from_rotvec(rv).as_matrix()
     c = np.cumsum(rng.normal(scale=0.01, size=(n, 3)), axis=0)
     X = Rotation.from_euler("z", 90, degrees=True).as_matrix() @ np.diag([1, -1, -1])
@@ -60,7 +60,7 @@ def test_estimate_frame_recovers_rotations():
     assert np.allclose(res["json_cam_to_device"], X, atol=1e-3)
     assert np.allclose(res["json_world_rotation"], W, atol=1e-3)
     assert res["residual_deg_median"] < 0.1 and res["shift_s"] == 0
-    # e la correzione applicata ai JSON riproduce le pose del device
+    # and the correction applied to the JSON poses gives back the device poses
     corr = apply_frame_correction(_traj(Rc, c).poses, X, W)
     assert np.allclose(Rotation.from_quat(corr[:, 3:]).as_matrix(), Rd, atol=1e-6)
 
@@ -80,8 +80,8 @@ def test_cross_fit_is_out_of_sample():
             "session": [f"s{i // 2}" for i in range(n)],
         }
     )
-    takes.loc[5, "label_idx"] = -1  # take fuori dalla testa: predetta, non usata nel fit
-    X[7] = np.nan  # take senza embedding: nessuna predizione
+    takes.loc[5, "label_idx"] = -1  # take outside the head: predicted, not used in the fit
+    X[7] = np.nan  # take without an embedding: no prediction
     hcfg = {"Cs": [0.1, 1.0], "inner_cv": 3, "max_iter": 500, "class_weight": None}
     res, folds = cross_fit(X, takes, C, hcfg, 0)
     P = res["probs"]
@@ -109,7 +109,7 @@ def test_cut_official_val():
         g = val[val.label == c]
         assert set(g.split) == {"val", "test"}
         assert abs((g.split == "test").mean() - 0.5) < 0.25
-    assert val[val.label == "C"].split.nunique() == 1  # una sola sessione: tutta da una parte
+    assert val[val.label == "C"].split.nunique() == 1  # a single session: all on one side
     assert set(cut_official_val(val, {"mode": "all_test", "test_frac": 0.5, "seed": 0})) == {"test"}
     assert set(cut_official_val(val, {"mode": "undecided", "test_frac": 0.5, "seed": 0})) == {"val"}
 
@@ -120,24 +120,24 @@ def test_pose_json_gap_count(tmp_path):
     from src.cascade.data.poses import from_pose_json
 
     E = np.concatenate([np.eye(3), np.zeros((3, 1))], 1).tolist()
-    frames = [i for i in range(5, 300) if not (100 <= i < 110)]  # inizio al frame 5, buco di 10 frame
+    frames = [i for i in range(5, 300) if not (100 <= i < 110)]  # starts at frame 5, gap of 10 frames
     f = tmp_path / "p.json"
     f.write_text(json.dumps({"aria01": {"camera_extrinsics": {str(i): E for i in frames}}}))
     pc = {"json_src_fps": 30.0, "fps": 20.0, "json_max_gap_frames": 15,
           "json_cam_to_device": np.eye(3).tolist(), "json_world_rotation": np.eye(3).tolist()}
     tr = from_pose_json(f, "x/aria01_214-1.mp4", pc)
     assert tr.n_missing_src == 10 and tr.first_src_frame == 5
-    assert tr.valid[tr.t > 1.0].all() and not tr.valid[0]  # buco corto interpolato, inizio mancante non valido
+    assert tr.valid[tr.t > 1.0].all() and not tr.valid[0]  # short gap interpolated, missing start invalid
 
 
 def _device_poses(n, pitch_deg, rng):
-    """Device Aria (x sx, y su, z avanti) con imbardata casuale, inclinazione fissa e un po' di rumore."""
+    """Aria device (x left, y up, z forward) with random yaw, fixed tilt and a little noise."""
     yaw = rng.uniform(-np.pi, np.pi, n)
     p = np.radians(pitch_deg + rng.normal(scale=3, size=n))
     z = np.stack([np.cos(yaw) * np.cos(p), np.sin(yaw) * np.cos(p), np.sin(p)], 1)
     y = np.stack([-np.cos(yaw) * np.sin(p), -np.sin(yaw) * np.sin(p), np.cos(p)], 1)
     x = np.cross(y, z)
-    return np.stack([x, y, z], 2)  # colonne = assi del device nel mondo
+    return np.stack([x, y, z], 2)  # columns = device axes in the world
 
 
 @pytest.mark.parametrize("k", [0, 1, 3])
@@ -152,7 +152,7 @@ def test_check_up_recovers_roll(k):
     sug = suggest_cam_to_device(np.array([st["up_x"], st["up_y"], st["up_z"]]))
     assert sug["roll_k"] == k and sug["residual_roll_deg"] < 5
     assert np.allclose(sug["json_cam_to_device"], X, atol=1e-6)
-    assert st["pitch_deg_median"] == pytest.approx(-15.0, abs=2)  # con k = 0 la camera è OpenCV dritta
+    assert st["pitch_deg_median"] == pytest.approx(-15.0, abs=2)  # with k = 0 the camera is an upright OpenCV camera
 
 
 def test_check_up_flags_world_upside_down():
@@ -160,13 +160,13 @@ def test_check_up_flags_world_upside_down():
 
     rng = np.random.default_rng(0)
     Rd = _device_poses(300, -15.0, rng)
-    flip = np.diag([1.0, -1.0, -1.0])  # mondo con z verso il basso
+    flip = np.diag([1.0, -1.0, -1.0])  # world with z pointing down
     Rc = np.einsum("ij,njk->nik", flip, Rd) @ np.diag([-1.0, -1.0, 1.0]).T
     assert up_statistics(_traj(Rc, np.zeros((300, 3))))["pitch_deg_median"] > 10
 
 
 def test_check_counts_missing_classes_and_embeddings():
-    """Audit punti 2 e 3: classi a 0 take e take senza embedding sono contate, non tolte in silenzio."""
+    """Audit items 2 and 3: classes with 0 takes and takes without an embedding are counted, not silently dropped."""
     import pandas as pd
 
     from src.cascade.training.heads import metrics, preregistered_check
@@ -177,7 +177,7 @@ def test_check_counts_missing_classes_and_embeddings():
         for c, n in ((0, 6), (1, 6), (2, 6 if split == "train" else 0)):
             for j in range(n):
                 rows.append({"split": split, "label_idx": c, "pred_idx": c, "pred": classes[c], "session": f"{split}{c}{j}"})
-    rows.append({"split": "val", "label_idx": 0, "pred_idx": np.nan, "pred": None, "session": "val_x"})  # senza embedding
+    rows.append({"split": "val", "label_idx": 0, "pred_idx": np.nan, "pred": None, "session": "val_x"})  # no embedding
     df = pd.DataFrame(rows)
     m = metrics(df, classes, "val", 1)
     assert m["n"] == 12 and m["n_no_embedding"] == 1 and m["bacc_classes"] == ["A", "B"]

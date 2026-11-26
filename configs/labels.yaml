@@ -1,11 +1,10 @@
-# Ordine canonico delle classi: indice = posizione nella lista.
-# È l'ordine di CamFormer (datasets/egoexo4d_pretrain.py::name2label e
-# tasks/pretrain_longseq.py::class_names), quindi coincide con un'eventuale testa
-# cls_model nel checkpoint. NON è l'ordine della colonna `label` di
-# scenario_cls.csv: la mappatura dal CSV avviene sempre per nome (`csv_task`).
+# Canonical class order: index = position in the list.
+# It is CamFormer's order (datasets/egoexo4d_pretrain.py::name2label and
+# tasks/pretrain_longseq.py::class_names), so it matches a cls_model head in the checkpoint, if there is one.
+# It is NOT the order of the `label` column of scenario_cls.csv: we always map the CSV by name (`csv_task`).
 classes:
-# Registro (N28, 17/11): 6 classi, nell'ordine delle teste di scenario_preds. Music (0 take) e Bouldering
-# (2 take) restano fuori: non hanno abbastanza take per essere imparate né valutate.
+# Decision log (N28, 17/11): 6 classes, in the order of the scenario_preds heads. Music (0 takes) and Bouldering
+# (2 takes) are left out: they do not have enough takes to be learned or evaluated.
   - {name: Basketball,  csv_task: Basketball,    kind: physical}
   - {name: Dance,       csv_task: Dance,         kind: physical}
   - {name: Soccer,      csv_task: Soccer,        kind: physical}

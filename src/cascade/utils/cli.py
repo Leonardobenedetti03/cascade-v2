@@ -1,14 +1,14 @@
-"""Argomenti comuni e contesto di uno stadio della pipeline.
+"""Common arguments and the context of one pipeline stage.
 
-Ogni script fa::
+Every script does::
 
     parser = stage_parser(__doc__, shards=True)
     args = parser.parse_args(argv)
     ctx = open_stage(args, "10_frames")
 
-``ctx`` contiene config, run_dir, cartella dello stadio, labels e logger.
-Con ``--synthetic`` la radice dei dati diventa ``<run_dir>/synthetic_data`` e il
-dataset finto viene generato (in modo idempotente) al primo uso.
+``ctx`` holds the config, the run_dir, the stage folder, the labels and the logger.
+With ``--synthetic`` the data root becomes ``<run_dir>/synthetic_data``, and the fake dataset is
+generated the first time it is needed (generating it twice does nothing).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from src import REPO_ROOT
 from src.cascade.data.labels import Labels, load_labels
 from src.cascade.utils import manifest, paths
 from src.cascade.utils.config import Config, dump_config, load_config
-from src.cascade.utils.io import json_default, read_json, write_json  # noqa: F401 - riesportati
+from src.cascade.utils.io import json_default, read_json, write_json  # noqa: F401 - re-exported
 from src.cascade.utils.logs import setup_logging
 from src.cascade.utils.seed import set_seed
 
@@ -72,45 +72,45 @@ class StageContext:
     num_shards: int = 1
     commit: str = "unknown"
     cfg_dict: dict = field(default_factory=dict)
-    scenario_labels: Optional[Labels] = None  # gli 8 scenari: inventario (00) e fold (05)
+    scenario_labels: Optional[Labels] = None  # the 8 scenarios: inventory (00) and folds (05)
 
     def path(self, template: str, **fields: object) -> Path:
-        fields.setdefault("run_name", self.run_dir.name)  # {run_name}: frames_dir persistente
+        fields.setdefault("run_name", self.run_dir.name)  # {run_name}: persistent frames_dir
         return paths.resolve(template, data=self.data_root, run=self.run_dir, **fields)
 
     @property
     def cam_seed(self) -> int:
-        """Seed del fine-tuning di CamFormer: identifica gli output di 20, 35, 45 e 50."""
+        """CamFormer fine-tuning seed. It identifies the outputs of 20, 35, 45 and 50."""
         s = self.cfg.camformer.seed
         return self.cfg.seed if s is None else int(s)
 
     @property
     def traj_tag(self) -> str:
-        """Frequenza delle traiettorie (ablation B4): identifica gli output di 40."""
+        """Trajectory rate (ablation B4). It identifies the outputs of 40."""
         return f"hz{self.cfg.data.traj_fps:g}"
 
     @property
     def cam_tag(self) -> str:
-        """Variante di L0 = seed del fine-tuning + frequenza delle traiettorie: identifica gli
-        output di 20, 35, 45 e 50 (3 seed e ablation sul frame rate nella stessa run)."""
+        """L0 variant = fine-tuning seed + trajectory rate. It identifies the outputs of 20, 35, 45 and 50
+        (3 seeds and the frame-rate ablation in the same run)."""
         return f"seed{self.cam_seed}_{self.traj_tag}"
 
     @property
     def l1_tag(self) -> str:
-        """Sorgente di L1: sempre ``probe`` (25 + logistica); il fine-tuning non si porta (M12)."""
+        """Source of L1: always ``probe`` (25 + logistic regression); we do not carry over the fine-tuning (M12)."""
         return self.cfg.heads.source
 
     @property
     def variant_tag(self) -> str:
-        """Identità di una cascata: la variante di L0. Identifica gli output di 35, 45 e 50."""
+        """Identity of a cascade, i.e. the L0 variant. It identifies the outputs of 35, 45 and 50."""
         return self.cam_tag
 
     def seed_dir(self, stage: str) -> Path:
-        """Cartella della variante di L0 (stadio 20)."""
+        """Folder of the L0 variant (stage 20)."""
         return self.run_dir / stage / self.cam_tag
 
     def variant_dir(self, stage: str) -> Path:
-        """Cartella della variante completa (stadi 35, 45, 50)."""
+        """Folder of the full variant (stages 35, 45, 50)."""
         return self.run_dir / stage / self.variant_tag
 
     def l1_dir(self) -> Path:
@@ -118,18 +118,18 @@ class StageContext:
 
     @property
     def clips_path(self) -> Path:
-        """Tabella delle clip (scenario): ``data/clips.csv``, scritta dallo stadio 00."""
+        """Clip table (scenario): ``data/clips.csv``, written by stage 00."""
         return self.run_dir / "data" / "clips.csv"
 
     def read_clips(self):
-        """Clip del task, dopo aver verificato lo stadio che le produce."""
+        """Clips of the task, after checking the stage that produces them."""
         import pandas as pd
 
         self.require("00_inventory")
         return pd.read_csv(self.clips_path)
 
     def done(self, outputs: Iterable[Path], part: Optional[str] = None) -> bool:
-        """True (e log) se lo stadio è già completo con questa config; errore se la config differisce."""
+        """True (and a log line) if the stage is already complete with this config; error if the config differs."""
         outs = list(outputs)
         if self.overwrite:
             return False
@@ -143,7 +143,7 @@ class StageContext:
         return False
 
     def finish(self, outputs: Iterable[Path], part: Optional[str] = None, extra: Optional[dict] = None) -> None:
-        """Scrive il manifest dello stadio: va chiamato per ultimo, dopo tutti gli output."""
+        """Write the stage manifest. Call it last, after all the outputs."""
         manifest.write_manifest(
             self.run_dir, self.name, self.cfg_dict, outputs, part=part, commit=self.commit, extra=extra
         )
@@ -151,7 +151,7 @@ class StageContext:
     def require(
         self, stage: str, *, parts: Optional[Sequence[str]] = None, sharded: bool = False, ignore: Sequence[str] = ()
     ) -> List[dict]:
-        """Stadio a monte completo e coerente con la config attuale (fail fast)."""
+        """Check that an upstream stage is complete and matches the current config; stop otherwise."""
         return manifest.require_stage(self.run_dir, stage, self.cfg_dict, parts=parts, sharded=sharded, ignore=ignore)
 
 
@@ -161,7 +161,7 @@ def git_commit() -> str:
             ["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
         )
         return out.stdout.strip()
-    except Exception:  # noqa: BLE001 - git può mancare sul nodo
+    except Exception:  # noqa: BLE001 - git may be missing on the node
         return "unknown"
 
 
@@ -181,7 +181,7 @@ def open_stage(args: argparse.Namespace, name: str, *, make_stage_dir: bool = Tr
         stage_dir.mkdir(parents=True, exist_ok=True)
     data_root = rdir / "synthetic_data" if args.synthetic else paths.data_root()
     scenario_labels = load_labels()
-    labels = scenario_labels  # nella v2 il task è sempre lo scenario (M12)
+    labels = scenario_labels  # in v2 the task is always the scenario (M12)
     set_seed(cfg.seed)
     dump_config(cfg, rdir / "configs" / f"{name}{suffix}.yaml")
     commit = git_commit()
@@ -217,7 +217,7 @@ def open_stage(args: argparse.Namespace, name: str, *, make_stage_dir: bool = Tr
 
 
 def shard_items(items: Sequence, shard_id: int, num_shards: int) -> List:
-    """Partizione deterministica round-robin: l'elemento i va allo shard i % num_shards."""
+    """Deterministic round-robin split: item i goes to shard i % num_shards."""
     return [x for i, x in enumerate(items) if i % num_shards == shard_id]
 
 

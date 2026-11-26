@@ -1,16 +1,16 @@
-"""L1: TimeSformer (SpaceTimeTransformer) con pesi EgoVLP, backbone congelato.
+"""L1: TimeSformer (SpaceTimeTransformer) with EgoVLP weights, frozen backbone.
 
-Struttura come ``EgoVLP/model/model.py::FrozenInTime`` ristretta al ramo video:
-``video_model`` (ViT-B/16, CLS a 768, ``head``/``pre_logits``/``fc`` = Identity) e
-``vid_proj = Sequential(Linear(768, 256))``. I nomi dei moduli coincidono con quelli
-del checkpoint, quindi lo ``state_dict`` si carica dopo aver tolto ``module.``.
+Same structure as ``EgoVLP/model/model.py::FrozenInTime``, restricted to the video branch:
+``video_model`` (ViT-B/16, 768-d CLS, ``head``/``pre_logits``/``fc`` = Identity) and
+``vid_proj = Sequential(Linear(768, 256))``. Module names match the checkpoint, so the ``state_dict`` loads
+after removing ``module.``.
 
-Input e normalizzazione (da ``data_loader/transforms.py`` e ``model.forward``):
-frame float in [0, 1], normalizzati con media/std ImageNet per canale, tensore
-``[B, T, C, H, W]`` (T = 4 frame a 224 px nello zero-shot / pretraining).
+Input and normalisation (from ``data_loader/transforms.py`` and ``model.forward``): float frames in [0, 1],
+normalised with the ImageNet per-channel mean/std, tensor ``[B, T, C, H, W]`` (T = 4 frames at 224 px in
+zero-shot / pre-training).
 
-Zero-shot: testo DistilBERT, ``last_hidden_state[:, 0]`` → ``txt_proj = ReLU, Linear(768, 256)``
-(``compute_text``); logit = similarità coseno video–testo / temperatura.
+Zero-shot: DistilBERT text, ``last_hidden_state[:, 0]`` → ``txt_proj = ReLU, Linear(768, 256)``
+(``compute_text``); logit = video–text cosine similarity / temperature.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def build_video_model(arch):
             self.vid_proj = nn.Sequential(nn.Linear(arch.embed_dim, arch.proj_dim))
 
         def forward(self, x):
-            cls = self.video_model(x)  # [B, 768] pre-proiezione
+            cls = self.video_model(x)  # [B, 768] before the projection
             return cls, self.vid_proj(cls)
 
     return EgoVLPVideo()
@@ -61,11 +61,11 @@ def _strip_module(sd: Dict) -> Dict:
 
 
 def _tolerant_pickle():
-    """Modulo ``pickle`` il cui Unpickler sostituisce le classi non importabili con un segnaposto.
+    """A ``pickle`` module whose Unpickler swaps classes it cannot import for a placeholder.
 
-    Il checkpoint EgoVLP_PT_BEST salva anche la config di addestramento come oggetto
-    ``parse_config.ConfigParser`` del repository EgoVLP: senza quel modulo nel path ``torch.load``
-    fallisce, anche se a noi serve solo ``state_dict``. Il segnaposto non viene mai usato.
+    The EgoVLP_PT_BEST checkpoint also stores the training config, as a ``parse_config.ConfigParser`` object from
+    the EgoVLP repository. Without that module on the path ``torch.load`` fails, even though we only need the
+    ``state_dict``. The placeholder is never used.
     """
     import pickle
     import types
@@ -100,10 +100,10 @@ def load_state(ckpt_path: Path) -> Dict:
 
 
 def load_video_weights(model, sd: Dict) -> Dict[str, List[str]]:
-    """Carica i pesi video (strict=False) con log delle chiavi; errore se manca una chiave video.
+    """Load the video weights (strict=False) and log the keys; error if a video key is missing.
 
-    ``temporal_embed`` con un numero diverso di frame viene troncato o completato con
-    zeri, come ``FrozenInTime._inflate_positional_embeds`` (``load_temporal_fix='zeros'``).
+    A ``temporal_embed`` with a different number of frames is cut or padded with zeros, like
+    ``FrozenInTime._inflate_positional_embeds`` (``load_temporal_fix='zeros'``).
     """
     import torch
 
@@ -136,7 +136,7 @@ def load_video_weights(model, sd: Dict) -> Dict[str, List[str]]:
 
 
 def normalize(frames_uint8: np.ndarray, mean: Sequence[float], std: Sequence[float]):
-    """uint8 [B, T, H, W, 3] → float [B, T, 3, H, W] normalizzato (come NormalizeVideo)."""
+    """uint8 [B, T, H, W, 3] → normalised float [B, T, 3, H, W] (like NormalizeVideo)."""
     import torch
 
     x = torch.from_numpy(np.ascontiguousarray(frames_uint8)).float() / 255.0
@@ -147,12 +147,12 @@ def normalize(frames_uint8: np.ndarray, mean: Sequence[float], std: Sequence[flo
 
 
 class TextEncoder:
-    """Encoder di testo per lo zero-shot.
+    """Text encoder for zero-shot.
 
-    ``text_model = distilbert-base-uncased``: DistilBERT + ``txt_proj`` dal checkpoint
-    (richiede ``transformers`` e il download del tokenizer/modello).
-    ``text_model = hashing``: proiezione casuale deterministica dei token (solo
-    ``--synthetic``: niente rete, niente pesi).
+    ``text_model = distilbert-base-uncased``: DistilBERT + ``txt_proj`` from the checkpoint (needs
+    ``transformers`` and a download of the tokenizer and model).
+    ``text_model = hashing``: a deterministic random projection of the tokens (only for ``--synthetic``: no
+    network, no weights).
     """
 
     def __init__(self, text_model: str, proj_dim: int, sd: Dict = None) -> None:

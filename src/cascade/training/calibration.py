@@ -1,11 +1,11 @@
-"""Calibratore del gate v2: dallo score al rischio che CamFormer sbagli, r̂(z) = P(c0 = 0 | z).
+"""Calibrator of the gate v2: from the score to the risk that CamFormer is wrong, r̂(z) = P(c0 = 0 | z).
 
-- ``platt``: r̂ = σ(a + b · logit(s)), due parametri (default: stabile con poche decine di errori);
-- ``isotonic``: regressione isotona su s (variante, a gradini).
+- ``platt``: r̂ = σ(a + b · logit(s)), two parameters (the default: stable with a few dozen errors);
+- ``isotonic``: isotonic regression on s (a step-wise variant).
 
-Il limite prudente ``r_up`` è il quantile 1 − δ di r̂ su repliche bootstrap del fit che ricampionano le
-SESSIONI: dove gli errori sono pochi il rischio è incerto e ``r_up`` sale. Il calibratore si stima sempre su
-score fuori campione (cross-fitting del livello 2), mai sulle take che valuta.
+The conservative bound ``r_up`` is the 1 − δ quantile of r̂ over bootstrap refits that resample SESSIONS.
+Where errors are few the risk is uncertain, and ``r_up`` goes up. The calibrator is always fitted on
+out-of-sample scores (the level-2 cross-fitting), never on the takes it evaluates.
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ log = logging.getLogger(__name__)
 
 
 def _platt_fit(z: np.ndarray, e: np.ndarray, w: Optional[np.ndarray] = None) -> Tuple[float, float]:
-    """(a, b) di σ(a + b z) con una logistica appena regolarizzata (C = 100: evita coefficienti infiniti se i
-    dati sono separabili). Con una sola classe: b = 0 e a = logit della frequenza con smoothing."""
+    """(a, b) of σ(a + b z), from a lightly regularised logistic regression (C = 100 avoids infinite coefficients
+    when the data are separable). With a single class: b = 0 and a = logit of the smoothed frequency."""
     from sklearn.linear_model import LogisticRegression
 
     if w is None:
@@ -81,7 +81,7 @@ class Calibrator:
         return self
 
     def predict(self, s: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """(r_hat, r_up). Senza bootstrap r_up = r_hat."""
+        """(r_hat, r_up). Without bootstrap, r_up = r_hat."""
         s = np.asarray(s, float)
         if self.method == "platt":
             a, b = self.params
@@ -100,7 +100,7 @@ class Calibrator:
 
 
 def ece(r: np.ndarray, e: np.ndarray, n_bins: int = 10) -> float:
-    """Errore di calibrazione atteso su fasce di quantile di r."""
+    """Expected calibration error over quantile bins of r."""
     r, e = np.asarray(r, float), np.asarray(e, float)
     if len(r) == 0:
         return float("nan")

@@ -1,18 +1,17 @@
-"""L0: CamFormer per la classificazione dello scenario.
+"""L0: CamFormer for scenario classification.
 
-Encoder e preprocessing vengono importati dal submodule
-``third_party/seeing_without_pixels`` (per percorso, senza toccare ``sys.path``,
-così i loro moduli generici ``models``/``utils`` non collidono con altri pacchetti):
+Encoder and preprocessing are imported from the submodule ``third_party/seeing_without_pixels``, by path and
+without touching ``sys.path``, so their generic ``models``/``utils`` modules do not clash with other packages:
 
-- ``models/cm_encoder.py::CameraPoseSeqEncoder`` con ``pooling='no'`` e
-  ``output_dim=512``, come in ``tasks/pretrain_longseq.py``;
-- ``utils/dataset_utils.py::transform_camera_pose`` (pose relative al frame centrale,
-  9D, + gravità per ``rel9d_grav``).
+- ``models/cm_encoder.py::CameraPoseSeqEncoder`` with ``pooling='no'`` and ``output_dim=512``, as in
+  ``tasks/pretrain_longseq.py``;
+- ``utils/dataset_utils.py::transform_camera_pose`` (poses relative to the central frame, 9D, + gravity for
+  ``rel9d_grav``).
 
-Encoding contestualizzato: in ingresso c'è il contesto (``camformer.context_s``),
-il mean-pool si fa solo sui token della finestra centrale ``[win_start, win_end)``
-(come ``encode_motion`` del task longseq); sopra c'è una testa lineare a C classi.
-Il fine-tuning è end-to-end (script di classificazione non pubblico: scritto qui).
+Contextual encoding: the input is the context (``camformer.context_s``), and the mean pool runs only over the
+tokens of the central window ``[win_start, win_end)`` (like ``encode_motion`` in the longseq task). A linear
+head with C classes sits on top. Fine-tuning is end-to-end. The authors did not release their classification
+script, so we wrote it here.
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ _MODULES: Dict[str, ModuleType] = {}
 
 
 def load_swp_module(rel_path: str) -> ModuleType:
-    """Importa un file del submodule CamFormer con un nome univoco."""
+    """Import a file of the CamFormer submodule under a unique name."""
     if rel_path in _MODULES:
         return _MODULES[rel_path]
     path = SWP_ROOT / rel_path
@@ -54,8 +53,8 @@ def load_swp_module(rel_path: str) -> ModuleType:
 
 
 def camformer_class_names() -> list:
-    """``class_names`` di ``tasks/pretrain_longseq.py`` (ordine della testa ``cls_model``),
-    letto con ``ast`` senza importare il modulo (che richiede clip e lightning)."""
+    """``class_names`` of ``tasks/pretrain_longseq.py`` (the order of the ``cls_model`` head), read with ``ast``
+    without importing the module (which needs clip and lightning)."""
     import ast
 
     tree = ast.parse((SWP_ROOT / "tasks" / "pretrain_longseq.py").read_text())
@@ -66,7 +65,7 @@ def camformer_class_names() -> list:
 
 
 def check_head_class_order(labels) -> None:
-    """La testa del checkpoint usa l'ordine di CamFormer: deve coincidere con labels.yaml."""
+    """The checkpoint head uses CamFormer's class order, which must match labels.yaml."""
     theirs = camformer_class_names()
     if list(labels.csv_tasks) != theirs:
         raise ValueError(
@@ -83,7 +82,7 @@ def encode_pose_id(name: str) -> int:
 
 
 def preprocess_poses(poses: np.ndarray, pose_encoding: str = "rel9d_grav") -> np.ndarray:
-    """Pose assolute [N, 7] → input di CamFormer, con la funzione originale."""
+    """Absolute poses [N, 7] → CamFormer input, with the original function."""
     du = load_swp_module("utils/dataset_utils.py")
     return du.transform_camera_pose(np.asarray(poses, dtype=np.float64), encode_pose_id(pose_encoding))
 
@@ -111,7 +110,7 @@ def build_model(arch, num_classes: int):
         def forward(self, x, pad_mask, lengths, win_start, win_end) -> Tuple:
             import torch
 
-            feats = self.encoder(x, pad_mask, lengths)  # [B, T, D] senza gravità
+            feats = self.encoder(x, pad_mask, lengths)  # [B, T, D] without gravity
             T = feats.shape[1]
             idx = torch.arange(T, device=feats.device)[None, :]
             m = ((idx >= win_start[:, None]) & (idx < win_end[:, None])).float()
@@ -122,11 +121,11 @@ def build_model(arch, num_classes: int):
 
 
 def load_pretrained(model, ckpt_path: Path, *, init_head: bool = False) -> Dict[str, list]:
-    """Carica i pesi dell'encoder da un checkpoint CamFormer (prefisso ``model.`` rimosso).
+    """Load the encoder weights from a CamFormer checkpoint (``model.`` prefix removed).
 
-    Come ``tasks/pretrain_longseq.py``: chiavi inattese ignorate (loggate), chiavi
-    mancanti dell'encoder → errore (di solito ``pose_encoding`` sbagliato).
-    Con ``init_head`` usa ``cls_model.{weight,bias}`` se presenti (stesso ordine classi).
+    As in ``tasks/pretrain_longseq.py``: unexpected keys are ignored (and logged), missing encoder keys are an
+    error (usually a wrong ``pose_encoding``). With ``init_head`` it uses ``cls_model.{weight,bias}`` if they are
+    there (same class order).
     """
     import torch
 
@@ -157,7 +156,7 @@ def load_pretrained(model, ckpt_path: Path, *, init_head: bool = False) -> Dict[
 
 
 def collate(batch):
-    """Padding come ``loader.longseq_pose_text_collate`` (pad_mask True sul padding)."""
+    """Padding like ``loader.longseq_pose_text_collate`` (pad_mask is True on the padding)."""
     import torch
     from torch.nn.utils.rnn import pad_sequence
 

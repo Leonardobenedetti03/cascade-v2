@@ -9,7 +9,7 @@ REAL_CSV = REPO_ROOT / "third_party/seeing_without_pixels/data_files/egoexo4d/sc
 
 def test_labels_order_and_kinds():
     lab = load_labels()
-    assert lab.num_classes == 6  # N28: Music e Bouldering fuori
+    assert lab.num_classes == 6  # N28: Music and Bouldering left out
     assert lab.names == ("Basketball", "Dance", "Soccer", "Cooking", "Health", "Bike repair")
     procedural = {n for n, p in zip(lab.names, lab.procedural_mask) if p}
     assert procedural == {"Cooking", "Health", "Bike repair"}

@@ -36,7 +36,7 @@ def test_deep_merge():
 
 
 def test_removed_sections_are_unknown():
-    """M12: streaming, keystep, task, bayes, level_minus1 e il fine-tuning di L1 non esistono più."""
+    """M12: streaming, keystep, task, bayes, level_minus1 and the L1 fine-tuning no longer exist."""
     for key in ("streaming", "task", "keystep"):
         with pytest.raises(KeyError):
             config_from_dict({key: {}})
@@ -70,7 +70,7 @@ def test_new_sections_have_defaults():
 
 
 def test_removed_gate_fields_are_unknown():
-    """M06: beta_*, prior_confusion, reliability e ridge_alphas non esistono più (nota N16)."""
+    """M06: beta_*, prior_confusion, reliability and ridge_alphas no longer exist (note N16)."""
     for key in ("beta_n0", "beta_q", "prior_confusion", "reliability", "ridge_alphas"):
         with pytest.raises(KeyError):
             config_from_dict({"gate": {key: 1}})

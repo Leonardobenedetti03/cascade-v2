@@ -1,8 +1,8 @@
-"""Configurazione: YAML + override ``--set chiave.puntata=valore``, variabili d'ambiente espanse.
+"""Configuration: YAML plus ``--set dotted.key=value`` overrides, with environment variables expanded.
 
-Regole: una chiave di override che non esiste nel YAML è un errore (un refuso non diventa un default
-silenzioso); un ``${VAR}`` non definito resta nel testo e diventa un errore solo quando quel valore
-viene usato come percorso (:func:`path`), così gli stadi che non lo usano girano lo stesso.
+Rules: an override key that does not exist in the YAML is an error (a typo must not turn into a silent
+default). An undefined ``${VAR}`` stays in the text, and it becomes an error only when that value is used
+as a path (:func:`path`). This way the stages that do not use it still run.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def load_config(path: Path, overrides: Iterable[str] = ()) -> Dict[str, Any]:
 
 
 def path(value: str) -> Path:
-    """Percorso da un valore di config; errore chiaro se resta una variabile non definita."""
+    """Path from a config value, with a clear error if an undefined variable is left in it."""
     m = _ENV.search(str(value))
     if m:
         raise EnvironmentError(f"variabile d'ambiente {m.group(1)} non definita (usata in {value!r}): vedi hpc/env.sh")
@@ -62,7 +62,7 @@ def path(value: str) -> Path:
 
 
 def section_hash(cfg: Dict[str, Any], keys: Iterable[str]) -> str:
-    """Hash delle sezioni di config che determinano l'uscita di uno stadio (per la ripresa)."""
+    """Hash of the config sections that determine the output of a stage (used to resume)."""
     sub = {k: cfg.get(k) for k in sorted(keys)}
     return hashlib.sha256(json.dumps(sub, sort_keys=True, default=str).encode()).hexdigest()[:16]
 

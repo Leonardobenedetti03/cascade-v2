@@ -1,52 +1,54 @@
-# Configurazione di base. Percorsi come template:
-#   {repo} = radice del repo, {data} = $CASCADE_DATA_ROOT o $DL4CV_ROOT/data,
-#   {run} = run_dir ($CASCADE_RUN_ROOT o $DL4CV_ROOT/runs)/<run_name>.
-# Nei pattern di take sono disponibili anche {takes_root} e {take_name}.
+# Base configuration. Paths are templates:
+#   {repo} = repository root, {data} = $CASCADE_DATA_ROOT or $DL4CV_ROOT/data,
+#   {run} = run_dir ($CASCADE_RUN_ROOT or $DL4CV_ROOT/runs)/<run_name>.
+# Take patterns can also use {takes_root} and {take_name}.
+# Several sections (frames, frame_baseline, fusion, site_diag, cost_e2e, ...) belong to our first pipeline, now in the
+# development history (tag archive/development). The code still reads them, so we left them as they were.
 
 run_name: mvp_D8
 seed: 0
 
 paths:
   scenario_csv: "{repo}/splits/site_v1/scenario_site.csv"
-  split_sha256: "c9f4e3083f57b099ef9693a5fa57b2f8666bddb6f4377834a7d015e2c7e0344d"  # SHA256 di scenario_csv: entra nei manifest (M07)
-  takes_json: "{data}/egoexo4d/takes.json"                       # assente sul cluster: site_v2 usa la durata del video (N23)
-  takes_root: "{data}/egoexo4d/takes"                            # sul cluster: link alle due metà del subset (N23)
-  # Stream RGB degli occhiali Aria, versione 448 px. Sul cluster il prefisso varia (aria01, aria02, aria, aria1):
-  # una sola *214-1*.mp4 per take, trovata da video_glob (N23).
+  split_sha256: "c9f4e3083f57b099ef9693a5fa57b2f8666bddb6f4377834a7d015e2c7e0344d"  # SHA256 of scenario_csv, written into the manifests (M07)
+  takes_json: "{data}/egoexo4d/takes.json"                       # not on the cluster: site_v2 uses the video duration (N23)
+  takes_root: "{data}/egoexo4d/takes"                            # on the cluster: links to the two halves of the subset (N23)
+  # RGB stream of the Aria glasses, 448 px version. On the cluster the prefix varies (aria01, aria02, aria, aria1):
+  # there is a single *214-1*.mp4 per take, found by video_glob (N23).
   video_pattern: "{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/aria01_214-1.mp4"
   video_glob: "{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/*214-1*.mp4"
-  traj_pattern: "{takes_root}/{take_name}/trajectory/closed_loop_trajectory.csv"   # solo traj_source=aria_csv
-  camformer_npz_dir: "{data}/camformer/egoexo4d_pretrain"        # solo traj_source=camformer_npz
+  traj_pattern: "{takes_root}/{take_name}/trajectory/closed_loop_trajectory.csv"   # only with traj_source=aria_csv
+  camformer_npz_dir: "{data}/camformer/egoexo4d_pretrain"        # only with traj_source=camformer_npz
   camformer_ckpt: "{data}/checkpoints/camformer/egoexo4d_dur8.pt"
   egovlp_ckpt: "{data}/checkpoints/egovlp/egovlp.pth"            # EgoVLP_PT_BEST
-  # pesi torchvision IMAGENET1K_V1 di mobilenet_v3_small (baseline un frame), scaricati sul login node (N23)
+  # torchvision IMAGENET1K_V1 weights of mobilenet_v3_small (one-frame baseline), downloaded on the login node (N23)
   frame_baseline_ckpt: "{data}/checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth"
-  frames_dir: "{data}/frames/{run_name}"                         # persistente, fuori dalla run (era {run}/10_frames)
+  frames_dir: "{data}/frames/{run_name}"                         # persistent, outside the run (it was {run}/10_frames)
   traj_cache_dir: "{run}/traj_cache"
-  traj_dir: "{run}/01_traj"                                      # uscita dello stadio 01 (M08): un <take_name>.npz per take
-  pose_roots: []                                                 # radici con split_manifest.csv: quelle vere in configs/hpc/site_v2.yaml (N23)
+  traj_dir: "{run}/01_traj"                                      # output of stage 01 (M08): one <take_name>.npz per take
+  pose_roots: []                                                 # roots with split_manifest.csv; the real ones were in configs/hpc/site_v2.yaml (N23)
 
 data:
-  window_s: 8.0              # durata D della clip; ablation 4 / 16
-  n_windows: 1               # K finestre per take (gate per finestra, aggregazione per take); ablation K = 3, 5
-  window_stride_s: null      # passo tra finestre se n_windows > 1 (default = window_s); solo con center
-  window_placement: center   # center (attorno al centro della take) | uniform (K parti uguali della take)
+  window_s: 8.0              # clip length D; ablation 4 / 16
+  n_windows: 1               # K windows per take (gate per window, aggregated per take); ablation K = 3, 5
+  window_stride_s: null      # step between windows if n_windows > 1 (default = window_s); only with center
+  window_placement: center   # center (around the centre of the take) | uniform (K equal parts of the take)
   duration_source: takes_json   # takes_json | video | trajectory
-  traj_source: aria_csv      # aria_csv (take intera, 1 kHz) | converted_npz (stadio 01) | camformer_npz (segmenti rilasciati)
-  traj_fps: 20.0             # frequenza attesa da CamFormer (1 kHz / 50)
-  pose_src_fps: 30.0         # frequenza delle pose per frame di Ego-Exo4D (stadio 01)
-  pose_max_gap_frames: 15    # buchi sorgente più lunghi (a 30 Hz: 0,5 s): nessuna traiettoria (stadio 01)
-  min_traj_coverage: 0.9     # frazione minima della finestra coperta dalla traiettoria
-  vertical_axis: 2           # asse "su" del mondo Aria (gravità = -z): verificato con lo stadio 15 (N26)
-  out_of_range: drop         # finestra oltre la fine del video: drop (scarta la clip) | clamp (ultimo frame)
-  short_take: keep           # take più corta di window_s: keep (finestra = take intera) | drop
-  max_missing_frac: 0.02     # clip perse tra uno stadio e l'altro oltre cui fermarsi (fail fast)
+  traj_source: aria_csv      # aria_csv (whole take, 1 kHz) | converted_npz (stage 01) | camformer_npz (released segments)
+  traj_fps: 20.0             # rate CamFormer expects (1 kHz / 50)
+  pose_src_fps: 30.0         # rate of the per-frame poses in Ego-Exo4D (stage 01)
+  pose_max_gap_frames: 15    # longer gaps in the source (0.5 s at 30 Hz): no trajectory (stage 01)
+  min_traj_coverage: 0.9     # minimum share of the window covered by the trajectory
+  vertical_axis: 2           # "up" axis of the Aria world (gravity = -z), checked with stage 15 (N26)
+  out_of_range: drop         # window past the end of the video: drop (discard the clip) | clamp (last frame)
+  short_take: keep           # take shorter than window_s: keep (window = whole take) | drop
+  max_missing_frac: 0.02     # clips lost between stages above which we stop (fail fast)
   expected_split_counts: {train: 1138, val: 68, test: 67}
 
 alignment:
-  # same_origin: t=0 della traiettoria coincide con t=0 del video (+ offset_s).
-  # device_us:   offset = (traj_start_us - video_start_us) / 1e6 dai metadati della take.
-  mode: same_origin          # verificato con lo stadio 15 (N26): nessuno sfasamento visibile, offset 0
+  # same_origin: t=0 of the trajectory is t=0 of the video (+ offset_s).
+  # device_us:   offset = (traj_start_us - video_start_us) / 1e6 from the take metadata.
+  mode: same_origin          # checked with stage 15 (N26): no visible shift, offset 0
   offset_s: 0.0
   scale: 1.0
   video_start_key: video_start_us
@@ -54,16 +56,16 @@ alignment:
 
 frames:
   n_frames: 16
-  # Come il transform di test di EgoVLP: Resize(256) lato corto, CenterCrop(256), Resize(224).
+  # Like EgoVLP's test transform: Resize(256) on the short side, CenterCrop(256), Resize(224).
   pre_resize: 256
   crop: 256
   size: 224
-  # Fedeltà a EgoVLP: i video erano ridotti a 256 px con ffmpeg (bicubico, antialias);
-  # torchvision 0.13 (loro ambiente) non fa antialias nel Resize(224) su tensori.
+  # To match EgoVLP: their videos were downscaled to 256 px with ffmpeg (bicubic, antialias), and
+  # torchvision 0.13 (their environment) does no antialias in Resize(224) on tensors.
   pre_resize_mode: bicubic
   pre_resize_antialias: true
   final_antialias: false
-  rotate_k90: 0              # rotazioni di 90° antiorarie: i frame 448 di Ego-Exo4D sono già dritti (N26)
+  rotate_k90: 0              # counter-clockwise 90° rotations: the 448 px Ego-Exo4D frames are already upright (N26)
   decoder: auto              # auto | decord | pyav
 
 folds:
@@ -71,53 +73,53 @@ folds:
   inner_holdout_frac: 0.1
   seed: 0
   group_by: site             # take | site (M03)
-  site_map: "{repo}/splits/site_v1/split.json"   # sito -> fold: dato versionato, non ricalcolato (D6)
+  site_map: "{repo}/splits/site_v1/split.json"   # site -> fold: a file kept in git, not recomputed (D6)
 
-# Baseline "un frame" L½ (B1): MobileNetV3-Small congelato su 1 frame a 112 px + testa
-# lineare per fold (stadio 28), e cascata a tre livelli CamFormer → 1 frame → TimeSformer
-# valutata nello stadio 50. Spenta di default.
+# "One frame" baseline L½ (B1): frozen MobileNetV3-Small on 1 frame at 112 px + a linear head
+# per fold (stage 28), and a three-level cascade CamFormer → 1 frame → TimeSformer evaluated in
+# stage 50. Off by default.
 frame_baseline:
   enabled: false
   arch: mobilenet_v3_small
-  frame_index: 8             # dei 16 frame estratti (il centro della finestra)
+  frame_index: 8             # which of the 16 extracted frames (the centre of the window)
   size: 112
-  pretrained: true           # da paths.frame_baseline_ckpt, nessun download
+  pretrained: true           # from paths.frame_baseline_ckpt, no download
   batch_size: 64
   device: auto
-  w_grid_step: 0.1           # griglia delle fusioni con L½
-  r_step: 5                  # griglia (r1, r2) della cascata a tre livelli
+  w_grid_step: 0.1           # grid of the fusions with L½
+  r_step: 5                  # (r1, r2) grid of the three-level cascade
 
 heads:
-  source: probe              # probe (backbone congelato + logistica) | finetune (stadio 26)
+  source: probe              # probe (frozen backbone + logistic regression) | finetune (stage 26)
   Cs: [0.001, 0.01, 0.1, 1.0, 10.0]
   inner_cv: 3
   max_iter: 2000
 
 fusion:
-  mode: replace              # replace (L1 sostituisce L0, M05) | fuse (log-lineare, ablation)
+  mode: replace              # replace (L1 replaces L0, M05) | fuse (log-linear, ablation)
   w_grid_step: 0.05
 
 cost:
   timesformer_frames: [4, 8, 16]
   latency_reps: 20
   gate_gmacs: 0.0
-  # fvcore (con handle per l'attenzione SDPA, che fvcore da solo non conta), con accanto
-  # torch.utils.flop_counter e la formula analitica come controllo: fvcore | torch | analytic.
+  # fvcore (with a handle for SDPA attention, which fvcore alone does not count), next to
+  # torch.utils.flop_counter and the analytic formula as a check: fvcore | torch | analytic.
   counter: fvcore
   device: auto
-  # sanity check, ordine di grandezza. CamFormer: arch di base, contesto 8 s a 20 Hz (T=160) + token di
-  # gravità = 0,1216 GMACs (formula analitica, I6; 0,02 era il valore a contesto corto).
+  # Sanity check on the order of magnitude. CamFormer: base arch, 8 s context at 20 Hz (T=160) + gravity
+  # token = 0.1216 GMACs (analytic formula, I6; 0.02 was the value with a short context).
   expected: {camformer: 0.12, timesformer_4f: 90.0}
 
-# Diagnostiche di sito (stadio 27, M02): sonda lineare sulle CLS di L1, solo train e val.
+# Site diagnostics (stage 27, M02): linear probe on the L1 CLS tokens, train and val only.
 site_diag:
-  C: 0.1          # come check_site.py della v1
+  C: 0.1          # as in check_site.py of v1
   max_iter: 500
-  cv_folds: 5     # GroupKFold per take e per sessione
+  cv_folds: 5     # GroupKFold by take and by session
 
-# Costo end-to-end (stadio 41, M10): tempo per fase di L0 e L1, a batch 1.
+# End-to-end cost (stage 41, M10): time of each phase of L0 and L1, at batch size 1.
 cost_e2e:
-  n_clips: 200    # campione stratificato per classe
-  n_warmup: 5     # clip di riscaldamento scartate
-  passes: 2       # si riporta la seconda passata; la prima si dichiara
+  n_clips: 200    # sample stratified by class
+  n_warmup: 5     # warm-up clips, discarded
+  passes: 2       # we report the second pass and state the first
   seed: 0

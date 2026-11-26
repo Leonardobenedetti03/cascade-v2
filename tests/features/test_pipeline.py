@@ -1,7 +1,7 @@
-"""Pipeline completa su dati sintetici (CPU): index -> traj -> check-frame -> feat-* -> heads.
+"""Full pipeline on synthetic data (CPU): index -> traj -> check-frame -> feat-* -> heads.
 
-Usa il codice vero di CamFormer (serve il clone del repository: variabile CAMFORMER_REPO o
-../ext/seeing_without_pixels) con pesi casuali, ed EgoVLP con un'architettura ridotta.
+It uses the real CamFormer code with random weights, so it needs a clone of their repository (the
+CAMFORMER_REPO variable, or ext/seeing_without_pixels at the repo root), and EgoVLP with a smaller architecture.
 """
 
 import json
@@ -16,7 +16,7 @@ from scipy.spatial.transform import Rotation
 REPO = Path(os.environ.get("CAMFORMER_REPO", Path(__file__).resolve().parents[2] / "ext" / "seeing_without_pixels"))
 FPS_VIDEO = 30
 DUR = 10.0
-X_TRUE = Rotation.from_euler("y", 90, degrees=True).as_matrix()  # camera -> device del finto Aria
+X_TRUE = Rotation.from_euler("y", 90, degrees=True).as_matrix()  # camera -> device of the fake Aria
 
 pytestmark = pytest.mark.skipif(not (REPO / "models" / "cm_encoder.py").exists(), reason="repository CamFormer assente")
 
@@ -101,7 +101,8 @@ def run(tmp_path_factory):
             "egovlp.proj_dim=16", "egovlp.num_workers=0", "split.n_folds=3", "heads.Cs=[0.1,1.0]",
             "data.expected_takes=45", "split.official_val.mode=split", "split.fold_seeds=[0,1]",
             "heads.min_takes_metric=1", "heads.n_boot=200", "check.min_bacc=0.3", "check.split=val",
-            # i dati sintetici hanno 3 classi su 6 e pesi casuali: niente controllo sulle classi mancanti né sull'intervallo
+            # the synthetic data has 3 classes out of 6 and random weights,
+            # so no check on missing classes or on the interval
             "check.require_all_classes=false", "check.ci_above_chance=false"]
     return tmp / "run", sets
 
@@ -130,11 +131,11 @@ def test_pipeline(run):
     assert (takes[takes.split == "train"][["fold_s0", "fold_s1"]] >= 0).all().all()
     ev = takes[takes.split_official == "val"]
     assert set(ev.split) == {"val", "test"}
-    for _, g in ev.groupby("label"):  # stratificato: ogni classe da entrambe le parti
+    for _, g in ev.groupby("label"):  # stratified: every class on both sides
         assert set(g.split) == {"val", "test"}
     assert not (set(ev.session[ev.split == "val"]) & set(ev.session[ev.split == "test"]))
     pred = pd.read_csv(run_dir / "predictions.csv")
-    assert "test" not in set(pred.split)  # test sigillato
+    assert "test" not in set(pred.split)  # sealed test
     assert not (run_dir / "sealed").exists()
     assert pred.cam_pred.notna().all() and pred.vid_pred.notna().all()
     assert set(pred.cam_pred_source) == {"oof", "fold_ensemble"}
@@ -148,19 +149,19 @@ def test_pipeline(run):
     assert chk["passed"] and chk["split"] == "val" and chk["chance"] == pytest.approx(1 / 3)
     classes = json.loads((run_dir / "classes.json").read_text())
     assert classes["classes"][:3] == ["Basketball", "Dance", "Soccer"]
-    # rilancio: lo stadio si salta; con un'altra config si ferma
+    # rerun: the stage is skipped; with a different config it stops
     _main("heads", sets)
     from src.cascade.utils.feature_io import StageConflict
 
     with pytest.raises(StageConflict):
         _main("heads", sets + ["heads.Cs=[1.0]"])
-    # soglia irraggiungibile: codice 3 (ferma la catena), anche al rilancio
+    # threshold out of reach: exit code 3 (stops the chain), also on rerun
     with pytest.raises(SystemExit) as e:
         _main("heads", sets + ["check.min_bacc=1.01"], "--overwrite")
     assert e.value.code == 3
     with pytest.raises(SystemExit):
         _main("heads", sets + ["check.min_bacc=1.01"])
-    # il test si apre solo con --eval-test, in un file a parte
+    # the test opens only with --eval-test, in a separate file
     _main("heads", sets, "--eval-test", "--overwrite")
     sealed = pd.read_csv(run_dir / "sealed" / "predictions.csv")
     assert set(sealed.split) == {"test"}
@@ -170,24 +171,24 @@ def test_pipeline(run):
 def test_guards(run):
     run_dir, sets = run
     _main("index", sets)
-    # check sul test vietato; soglia non fissata vietata
+    # check on the test split not allowed; threshold not set not allowed
     for bad in (["check.split=test"], ["check.min_bacc=null"]):
         with pytest.raises(ValueError):
             _main("heads", sets + bad, "--overwrite")
-    # taglio non deciso: index gira, heads no; le feature non si rifanno (non dipendono dallo split)
+    # cut not decided: index runs, heads does not; features are not recomputed (they do not depend on the split)
     _main("index", sets + ["split.official_val.mode=undecided"], "--overwrite")
     with pytest.raises(RuntimeError, match="undecided"):
         _main("heads", sets + ["split.official_val.mode=undecided"])
-    _main("feat-camformer", sets + ["split.official_val.mode=undecided"])  # già fatto, nessun conflitto
-    # opzione C: tutta la val ufficiale va al test, il controllo usa il train fuori campione
+    _main("feat-camformer", sets + ["split.official_val.mode=undecided"])  # already done, no conflict
+    # option C: the whole official val goes to test, and the check uses the out-of-sample train
     _main("index", sets + ["split.official_val.mode=all_test"], "--overwrite")
-    with pytest.raises(ValueError, match="all_test"):  # senza val il controllo non può usare la val
+    with pytest.raises(ValueError, match="all_test"):  # without val the check cannot use val
         _main("heads", sets + ["split.official_val.mode=all_test"], "--overwrite")
     _main("heads", sets + ["split.official_val.mode=all_test", "check.split=train"], "--overwrite")
     chk = json.loads((run_dir / "check.json").read_text())
     assert chk["split"] == "train" and chk["passed"] and chk["min_recall"] is None
-    assert "test" not in set(pd.read_csv(run_dir / "predictions.csv").split)  # test sigillato anche con all_test
-    # richiamo minimo irraggiungibile: il controllo fallisce anche con l'accuratezza bilanciata sopra soglia
+    assert "test" not in set(pd.read_csv(run_dir / "predictions.csv").split)  # test sealed with all_test too
+    # minimum recall out of reach: the check fails even with the balanced accuracy above the threshold
     with pytest.raises(SystemExit) as e:
         _main("heads", sets + ["split.official_val.mode=all_test", "check.split=train", "check.min_bacc=0.0",
                                "check.min_recall=1.01"], "--overwrite")
@@ -207,7 +208,7 @@ def test_check_frame_and_json_source(run):
     s = json.loads((run_dir / "check_frame" / "summary.json").read_text())
     assert np.allclose(s["json_cam_to_device"], X_TRUE, atol=1e-2), s
     assert np.allclose(s["json_world_rotation"], np.eye(3), atol=1e-2), s
-    # con la correzione stimata, le pose JSON coincidono con quelle del CSV
+    # with the estimated correction, the JSON poses match the CSV ones
     from src.cascade.data.poses import from_aria_csv, from_pose_json
     from src.cascade.utils.feature_config import load_config
 
@@ -222,7 +223,7 @@ def test_check_frame_and_json_source(run):
 
 
 def test_require_all_classes(run):
-    """Audit punto 2: una classe della testa senza take nello split del controllo fa fallire il controllo."""
+    """Audit item 2: a head class with no takes in the split of the check makes the check fail."""
     run_dir, sets = run
     _main("index", sets)
     with pytest.raises(SystemExit) as e:
@@ -236,7 +237,7 @@ def test_require_all_classes(run):
 
 
 def test_select(run, tmp_path):
-    """Audit punto 1: la scelta di pose e finestre si fa sulla val, tra candidate che differiscono solo lì."""
+    """Audit item 1: poses and windows are chosen on val, among candidates that differ only there."""
     run_dir, sets = run
     flip = "poses.json_cam_to_device=[[-1,0,0],[0,-1,0],[0,0,1]]"
     cands = []
@@ -254,7 +255,7 @@ def test_select(run, tmp_path):
     best = max(out["candidates"], key=lambda c: c["val_bacc"])
     assert out["chosen"]["val_bacc"] == pytest.approx(best["val_bacc"])
     assert any(x.startswith("window.n_windows=") for x in out["set_for_final_run"])
-    # una candidata con un'altra config (non solo pose e finestre) non è ammessa
+    # a candidate with a different config (not only poses and windows) is not allowed
     d = tmp_path / "otherC"
     os.environ["SCENARIO_RUN_DIR"] = str(d)
     for st in ("index", "traj", "feat-camformer"):
@@ -263,7 +264,7 @@ def test_select(run, tmp_path):
     os.environ["SCENARIO_RUN_DIR"] = str(tmp_path / "sel")
     with pytest.raises(RuntimeError, match="diverse"):
         _main("select", sets, "--candidates", cands[0], str(d))
-    # una candidata che ha aperto il test non è ammessa
+    # a candidate that opened the test is not allowed
     os.environ["SCENARIO_RUN_DIR"] = cands[0]
     _main("heads", sets, "--models", "camformer", "--skip-check", "--eval-test", "--overwrite")
     os.environ["SCENARIO_RUN_DIR"] = str(tmp_path / "sel")

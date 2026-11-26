@@ -1,4 +1,4 @@
-"""Gestione centralizzata dei seed."""
+"""Seeds, set in one place."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ import numpy as np
 
 
 def set_seed(seed: int, *, deterministic_torch: bool = False) -> None:
-    """Fissa i seed di random, numpy e (se installato) torch.
+    """Set the seeds of random, numpy and torch (if installed).
 
-    ``PYTHONHASHSEED`` qui vale solo per eventuali sottoprocessi: l'hashing delle stringhe del
-    processo corrente è già fissato all'avvio. Il codice non dipende dall'ordine dei ``set``.
+    ``PYTHONHASHSEED`` here only affects subprocesses: string hashing in the current process is fixed when it
+    starts. The code does not depend on the order of ``set`` elements.
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -30,5 +30,5 @@ def set_seed(seed: int, *, deterministic_torch: bool = False) -> None:
 
 
 def rng(seed: int, *salt: int) -> np.random.Generator:
-    """Generatore numpy derivato in modo deterministico da seed e sale."""
+    """Numpy generator derived deterministically from a seed and a salt."""
     return np.random.default_rng([seed, *salt])

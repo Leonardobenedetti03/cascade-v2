@@ -1,9 +1,9 @@
-"""Scritture atomiche (file temporaneo + rename) e marcatori di completamento degli stadi.
+"""Atomic writes (temporary file + rename) and completion markers for the stages.
 
-Un'uscita esiste solo se è completa: lo dice il marcatore ``_done/<stadio>.json``, scritto per
-ultimo, con l'hash delle sezioni di config usate. Al rilancio lo stadio si salta se marcatore e
-uscite ci sono e l'hash coincide; con un hash diverso si ferma (serve ``--overwrite``), così non si
-mescolano uscite di config diverse.
+An output exists only if it is complete. The marker ``_done/<stage>.json`` says so: it is written last, with
+the hash of the config sections the stage used. When we run again, a stage is skipped if the marker and the
+outputs are there and the hash matches. If the hash is different the stage stops (you need ``--overwrite``),
+so outputs of different configs never get mixed.
 """
 
 from __future__ import annotations

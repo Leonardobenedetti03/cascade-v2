@@ -1,11 +1,11 @@
-# Python >= 3.9. torch e torchvision: installare la build della CUDA del cluster (es. --index-url .../whl/cu121).
+# Python >= 3.9. torch and torchvision: install the build for the cluster's CUDA (e.g. --index-url .../whl/cu121).
 torch
 numpy>=1.24
 scipy>=1.10
 pandas>=2.0
 scikit-learn>=1.3
 pyyaml>=6.0
-einops>=0.7     # TimeSformer di EgoVLP
-av>=11.0        # decodifica video e lettura degli header
-decord>=0.6; platform_system == "Linux" and python_version < "3.12"   # opzionale, più veloce
+einops>=0.7     # EgoVLP's TimeSformer
+av>=11.0        # video decoding and header reading
+decord>=0.6; platform_system == "Linux" and python_version < "3.12"   # optional, faster
 pytest>=7.4

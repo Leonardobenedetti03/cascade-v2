@@ -1,24 +1,24 @@
-"""Feature e scorer del gate v2. Score più alto = più probabile che CamFormer sbagli.
+"""Features and scorers of the gate v2. A higher score means CamFormer is more likely to be wrong.
 
-Feature (solo da CamFormer e dalla traiettoria):
-- ``A``: logit di p_max (troncato), margine top-1 − top-2, entropia normalizzata;
-- ``B``: affidabilità della classe predetta (quota di predizioni corrette di CamFormer per quella classe, con
-  smoothing (k + α)/(n + 2α)) e flag "top-1 e top-2 entrambe procedurali". L'affidabilità di una riga nuova si
-  stima su tutte le righe di fit. Quella di una riga di fit è FUORI FOLD (N38): le righe di fit si dividono in K
-  fold per sessione (stratificate per classe predetta) e ogni fold riceve l'affidabilità calcolata sulle altre;
-  l'esito di una riga pesa per circa 1/(take della fold) sul suo valore, come nel gate v1 che escludeva la fold.
-  La versione della run del 18/11 (job 772601) escludeva la sola sessione della riga: dentro il training set il
-  valore, (corrette − corrette della sessione)/(predette − predette della sessione), era una funzione decrescente
-  degli esiti della sessione; con sessioni di una take (la mediana) è un leave-one-out esatto. Correlazione con
-  l'errore dentro classe 0,6–0,95 sui dati reali: LightGBM imparava una regola rovesciata;
-- ``C``: moto della camera (``motion.MOTION_FEATURES``), imputato con la mediana del fit.
+Features (only from CamFormer and the trajectory):
+- ``A``: logit of p_max (clipped), top-1 − top-2 margin, normalised entropy;
+- ``B``: reliability of the predicted class (share of CamFormer's correct predictions for that class, smoothed as
+  (k + α)/(n + 2α)) and a flag "top-1 and top-2 are both procedural". The reliability of a new row is estimated
+  on all the fit rows. For a fit row it is computed OUT OF FOLD (N38): we split the fit rows into K folds by
+  session (stratified by predicted class), and each fold gets the reliability computed on the others. So the
+  outcome of a row weighs about 1/(takes in the fold) on its own value, as in the gate v1, which left the fold
+  out. The version used in the run of 18/11 (job 772601) left out only the row's own session. Inside the training
+  set, its value, (correct − correct in the session)/(predicted − predicted in the session), was a decreasing
+  function of the session's outcomes, and with one-take sessions (the median) it is exactly leave-one-out. Its
+  correlation with the error within a class was 0.6–0.95 on the real data, and LightGBM learned a reversed rule;
+- ``C``: camera motion (``motion.MOTION_FEATURES``), imputed with the median of the fit rows.
 
-Scorer:
-- ``thr_maxprob``: 1 − p_max, nessun fit (riferimento);
-- ``class_rule``: 1 se la classe predetta è procedurale, 0 altrimenti (regola per classe come gate);
-- ``logreg_<gruppi>``: imputazione, standardizzazione e logistica SENZA pesi di classe (probabilità di errore),
-  C scelto in CV raggruppata per sessione (log-loss);
-- ``lgbm_<gruppi>``: LightGBM con alberi piccoli, arresto anticipato su un holdout per sessione.
+Scorers:
+- ``thr_maxprob``: 1 − p_max, no fit (the reference);
+- ``class_rule``: 1 if the predicted class is procedural, 0 otherwise (a per-class rule used as a gate);
+- ``logreg_<groups>``: imputation, standardisation and logistic regression WITHOUT class weights (so it gives an
+  error probability), C chosen by CV grouped by session (log-loss);
+- ``lgbm_<groups>``: LightGBM with small trees and early stopping on a holdout split by session.
 """
 
 from __future__ import annotations
@@ -51,8 +51,8 @@ def group_a(P: np.ndarray) -> np.ndarray:
 
 
 class FeatureBuilder:
-    """Costruisce le feature; ``fit`` memorizza i conteggi di affidabilità delle righe di fit e, per le righe di
-    fit stesse, l'affidabilità fuori fold (``train_reliability``)."""
+    """Build the features. ``fit`` stores the reliability counts of the fit rows and, for the fit rows
+    themselves, the out-of-fold reliability (``train_reliability``)."""
 
     def __init__(self, groups: List[str], procedural: np.ndarray, alpha: float = 1.0, n_folds: int = 5) -> None:
         bad = set(groups) - {"A", "B", "C"}
@@ -75,9 +75,9 @@ class FeatureBuilder:
         if "B" in self.groups:
             s = np.asarray(sessions).astype(str)
             k = min(self.n_folds, len(np.unique(s)))
-            rel = np.full(len(P), self._rate(np.zeros(1), np.zeros(1))[0])  # una sola sessione: solo il prior
+            rel = np.full(len(P), self._rate(np.zeros(1), np.zeros(1))[0])  # a single session: only the prior
             if k >= 2:
-                fold = session_folds(pred, s, k, seed)  # stratificate per classe PREDETTA: non dipendono dalle label
+                fold = session_folds(pred, s, k, seed)  # stratified by PREDICTED class: no labels used
                 for j in range(k):
                     m = fold == j
                     n_out = self.n_pred - np.bincount(pred[m], minlength=C)
@@ -89,12 +89,12 @@ class FeatureBuilder:
         return self
 
     def reliability(self, P: np.ndarray) -> np.ndarray:
-        """Affidabilità per righe NUOVE: conteggi di tutte le righe di fit."""
+        """Reliability for NEW rows: counts from all the fit rows."""
         pred = P.argmax(1)
         return self._rate(self.n_pred[pred], self.n_corr[pred])
 
     def transform(self, P: np.ndarray, M: np.ndarray, training: bool = False) -> np.ndarray:
-        """``training=True`` solo per le stesse righe passate a ``fit``: affidabilità fuori fold."""
+        """``training=True`` only for the same rows passed to ``fit``: out-of-fold reliability."""
         mats = []
         for g in self.groups:
             if g == "A":
@@ -123,7 +123,7 @@ class FeatureBuilder:
 
 
 def session_cv(y: np.ndarray, groups: np.ndarray, n_splits: int, seed: int):
-    """Split stratificati per ``y`` e raggruppati per sessione; meno fold se i gruppi con positivi sono pochi."""
+    """Splits stratified by ``y`` and grouped by session; fewer folds if few groups have positives."""
     from sklearn.model_selection import StratifiedGroupKFold
 
     g = np.asarray(groups).astype(str)
@@ -274,7 +274,7 @@ def _groups(suffix: str) -> List[str]:
 
 def make_scorer(name: str, gcfg, procedural: np.ndarray) -> Scorer:
     sc = _make_scorer(name, gcfg, procedural)
-    sc.fb.n_folds = int(getattr(gcfg, "reliability_folds", 5))  # fold dell'affidabilità fuori fold (N38)
+    sc.fb.n_folds = int(getattr(gcfg, "reliability_folds", 5))  # folds of the out-of-fold reliability (N38)
     return sc
 
 
@@ -303,7 +303,7 @@ def _make_scorer(name: str, gcfg, procedural: np.ndarray) -> Scorer:
 
 
 def check_scorers(names: List[str], gcfg, procedural: np.ndarray) -> None:
-    """Errore subito (prima delle teste) se uno scorer non esiste o manca LightGBM."""
+    """Fail at once (before the heads) if a scorer does not exist or LightGBM is missing."""
     for n in names:
         make_scorer(n, gcfg, procedural)
         if n.startswith("lgbm_"):

@@ -1,19 +1,19 @@
-"""40 — Costo per take dei due livelli: GMACs (fvcore) e latenza. [GPU o CPU]
+"""Stage 40: cost per take of the two levels, as GMACs (fvcore) and latency. [GPU or CPU]
 
-Scopo:
-    GMACs con fvcore (più handle per l'attenzione SDPA), batch 1, una sola vista, input
-    identico all'inferenza, con accanto il contatore di torch e la formula analitica:
-    CamFormer sul contesto (camformer.context_s, o la finestra) a data.traj_fps più il
-    token di gravità; TimeSformer-EgoVLP a 4 frame 224 px (e cost.timesformer_frames,
-    es. 8 e 16). Latenza media sul device disponibile (GPU se c'è).
-    Valori attesi come sanity check (cost.expected): CamFormer ~0,12 GMACs (8 s a 20 Hz),
-    TimeSformer-B 4×224 ~90 GMACs; uno scarto > 3× viene segnalato nel log.
+What it does:
+    GMACs from fvcore (plus a handle for SDPA attention), batch 1, a single view, the same input as at
+    inference, next to the torch counter and the analytic formula. CamFormer runs on the context
+    (camformer.context_s, or the window) at data.traj_fps plus the gravity token; TimeSformer-EgoVLP on
+    4 frames at 224 px (and cost.timesformer_frames, e.g. 8 and 16). Mean latency on the available device
+    (GPU if there is one).
+    Expected values, as a sanity check (cost.expected): CamFormer ~0.12 GMACs (8 s at 20 Hz),
+    TimeSformer-B 4×224 ~90 GMACs. A gap larger than 3× is reported in the log.
 
 Input:
-    configurazione (architetture); nessun dato
+    the configuration (architectures); no data
 
 Output:
-    <run_dir>/40_cost/hz<F>/cost.json   (il costo di CamFormer dipende dalla frequenza)
+    <run_dir>/40_cost/hz<F>/cost.json   (CamFormer's cost depends on the trajectory rate)
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     cfg = ctx.cfg
     dev = resolve_device(cfg.cost.device)
     res = {"device": str(dev)}
-    # ---------------------------------------------------------------- CamFormer
+    # CamFormer
     ctx_s = cfg.camformer.context_s or cfg.data.window_s
     T = int(round(ctx_s * cfg.data.traj_fps))
     cam = build_model(cfg.camformer.arch, ctx.labels.num_classes).to(dev)
@@ -64,7 +64,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         cam, inputs, cfg.cost.counter, analytic_macs=camformer_macs(T, cfg.camformer.arch, ctx.labels.num_classes)
     )
     res["camformer"] = {**g, "tokens": T, "context_s": ctx_s, **measure_latency_ms(cam, inputs, cfg.cost.latency_reps)}
-    # ---------------------------------------------------------------- TimeSformer
+    # TimeSformer
     res["timesformer"] = {}
     a = cfg.egovlp.arch
     frames = sorted(set([a.num_frames] + list(cfg.cost.timesformer_frames)))
@@ -78,7 +78,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             **measure_latency_ms(m, xi, max(1, cfg.cost.latency_reps // 4)),
         }
         del m
-    # --------------------------------------------------------------- baseline un frame (B1)
+    # One-frame baseline (B1)
     if cfg.frame_baseline.enabled:
         from src.cascade.models.gmac.frame_baseline import build_frame_model, pixels_read
 

@@ -1,4 +1,4 @@
-"""Logging su file (nella run_dir) e su console."""
+"""Logging to a file (in the run_dir) and to the console."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def setup_logging(log_file: Optional[Path] = None, level: str = "INFO") -> loggi
 
 
 def progress(iterable, total=None, desc: str = ""):
-    """Barra di avanzamento solo se stderr è un terminale (mai nei file di log né in SLURM)."""
+    """Progress bar only when stderr is a terminal (never in log files or under SLURM)."""
     if not sys.stderr.isatty():
         return iterable
     try:

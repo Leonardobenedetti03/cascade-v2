@@ -1,19 +1,19 @@
-"""CV annidata del gate v2 per una partizione esterna (un "repeat").
+"""Nested CV of the gate v2 for one outer partition (one "repeat").
 
-Per ogni fold esterna k (take della fold = valutazione, il resto = train esterno):
+For each outer fold k (the takes of the fold are evaluated, the rest is the outer train):
 
-1. **Livello 1, teste.** CV per sessione dentro il train esterno: la testa di CamFormer addestrata sulle altre
-   fold interne predice la fold interna -> predizioni fuori campione ``P_in`` su tutto il train esterno. Poi le
-   teste di CamFormer ed EgoVLP si rifanno su tutto il train esterno e predicono la fold k (``outer_l0 =
-   inner_mean``: per CamFormer, media dei modelli interni invece del refit).
-2. **Livello 2, gate.** Cross-fitting per sessione sul train esterno con ``P_in``: lo scorer addestrato sulle altre
-   fold del gate dà score fuori campione ``s_cf``. Con ``s_cf`` si stimano il calibratore e le soglie delle regole
-   ``risk``, ``acc_target`` e ``budget``. Lo scorer si rifà su tutto il train esterno.
-3. **Livello 3, applicazione.** Score, rischio e decisioni sulla fold k con tutto congelato.
+1. **Level 1, heads.** CV by session inside the outer train: the CamFormer head trained on the other inner
+   folds predicts the inner fold, which gives out-of-sample predictions ``P_in`` on the whole outer train.
+   Then the CamFormer and EgoVLP heads are refit on the whole outer train and predict fold k (with
+   ``outer_l0 = inner_mean``, CamFormer uses the mean of the inner models instead of the refit).
+2. **Level 2, gate.** Cross-fitting by session on the outer train with ``P_in``: the scorer trained on the
+   other gate folds gives out-of-sample scores ``s_cf``. From ``s_cf`` we fit the calibrator and the thresholds
+   of the ``risk``, ``acc_target`` and ``budget`` rules. Then the scorer is refit on the whole outer train.
+3. **Level 3, application.** Score, risk and decisions on fold k, with everything frozen.
 
-Il target del gate è e = 1 − c0 (CamFormer sbaglia): con EgoVLP sempre corretto coincide con il beneficio
-atteso Δ(z) della regola ottima. La correttezza di EgoVLP si misura solo al livello 3, per valutare.
-Le take senza embedding CamFormer non entrano nei fit e vanno sempre a EgoVLP.
+The gate target is e = 1 − c0 (CamFormer is wrong). If EgoVLP is always right, this is the expected benefit
+Δ(z) of the optimal rule. EgoVLP's correctness is measured only at level 3, for the evaluation.
+Takes without a CamFormer embedding never enter the fits and always go to EgoVLP.
 """
 
 from __future__ import annotations
@@ -45,10 +45,11 @@ def outer_assignment(data: ScenarioData, gcfg, repeat: int) -> np.ndarray:
 
 
 def calibration_rows(data: ScenarioData, tr0: np.ndarray, e_in: np.ndarray, gcfg, repeat: int, k: int):
-    """Maschera sulle righe ``tr0`` del train esterno per calibratore e soglie (N38) e popolazione usata.
+    """Mask over the rows ``tr0`` of the outer train used for the calibrator and the thresholds (N38), and the
+    population actually used.
 
-    Usa solo metadati del train (``camformer_pretrain``): la decisione sulle take valutate resta quella di
-    sempre, score -> rischio -> regola, senza metadati."""
+    It uses only train metadata (``camformer_pretrain``). The decision on the evaluated takes is the usual one,
+    score -> risk -> rule, with no metadata."""
     pop = getattr(gcfg, "calibration_population", "all")
     if pop == "all":
         return np.ones(len(tr0), bool), "all"
@@ -69,7 +70,7 @@ def calibration_rows(data: ScenarioData, tr0: np.ndarray, e_in: np.ndarray, gcfg
 
 
 def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) -> Dict[str, object]:
-    """Livelli 1–3 per la fold esterna k. Restituisce righe per take, soglie, log delle teste e importanze."""
+    """Levels 1–3 for outer fold k. Returns per-take rows, thresholds, the head logs and the importances."""
     y, sess, C = data.y, data.sessions, len(data.classes)
     te = np.flatnonzero(fold == k)
     tr = np.flatnonzero(fold != k)
@@ -77,7 +78,7 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
     te0 = te[data.has_l0[te]]
     heads_log: List[dict] = []
 
-    # ---- livello 1: predizioni fuori campione di CamFormer sul train esterno
+    # Level 1: out-of-sample CamFormer predictions on the outer train
     inner = session_folds(y[tr0], sess[tr0], gcfg.inner_folds, _seed(repeat, k, 2))
     P_in = np.full((len(tr0), C), np.nan)
     inner_models = []
@@ -100,7 +101,7 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
     if not np.isfinite(P_in).all():
         raise RuntimeError("predizioni interne mancanti: fold interne incomplete")
 
-    # ---- teste esterne: CamFormer ed EgoVLP sul train esterno, predizioni sulla fold k
+    # Outer heads: CamFormer and EgoVLP fitted on the outer train, predictions on fold k
     P_out = np.full((len(te), C), np.nan)
     pos0 = np.isin(te, te0)
     if gcfg.outer_l0 == "refit":
@@ -129,7 +130,7 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
     )
     V_out = h1.predict_proba(data.X_vid[te])
 
-    # ---- livello 2: gate in cross-fitting sul train esterno
+    # Level 2: the gate, cross-fitted on the outer train
     y_in, s_in, M_in = y[tr0], sess[tr0], data.motion[tr0]
     e_in = (P_in.argmax(1) != y_in).astype(int)
     gfold = session_folds(y_in, s_in, gcfg.gate_folds, _seed(repeat, k, 6))
@@ -153,7 +154,7 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
                 P_in[fit_m], M_in[fit_m], y_in[fit_m], e_in[fit_m], s_in[fit_m], seed=_seed(repeat, k, 7, g)
             )
             s_cf[held] = sc.score(P_in[held], M_in[held])
-        s_cal, e_cal = s_cf[cal_m], e_in[cal_m]  # calibratore e soglie: righe scelte da calibration_population
+        s_cal, e_cal = s_cf[cal_m], e_in[cal_m]  # calibrator and thresholds: rows chosen by calibration_population
         cal = Calibrator(gcfg.calibration, gcfg.calibration_boot, gcfg.delta, _seed(repeat, k, 8))
         cal.fit(s_cal, e_cal, s_in[cal_m])
         final = make_scorer(name, gcfg, data.procedural).fit(P_in, M_in, y_in, e_in, s_in, seed=_seed(repeat, k, 9))
@@ -202,7 +203,7 @@ def run_fold(data: ScenarioData, gcfg, repeat: int, k: int, fold: np.ndarray) ->
 
 
 def run_all(data: ScenarioData, gcfg, n_jobs: int = 1) -> Dict[str, pd.DataFrame]:
-    """Tutte le fold esterne di tutti i repeat (in parallelo con ``n_jobs``)."""
+    """All the outer folds of all repeats (in parallel with ``n_jobs``)."""
     from joblib import Parallel, delayed
 
     jobs = []

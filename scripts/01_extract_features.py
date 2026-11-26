@@ -1,20 +1,22 @@
-"""Punto d'ingresso unico:  python -m scenario <stadio> --config configs/default.yaml [--set k=v] [--overwrite]
+"""Feature pipeline:  python scripts/01_extract_features.py <stage> [--config FILE] [--set k=v] [--overwrite]
 
-Stadi, nell'ordine:
-  index           indice delle take: etichette, split, fold, video, durata          (CPU)
-  traj            traiettorie a 20 Hz, una per take                                  (CPU)
-  check-up        (diagnostica) verso dell'alto nei JSON: rollio della camera RGB e
-                  segno dell'asse z del mondo; suggerisce poses.json_cam_to_device (CPU)
-  check-frame     (diagnostica) stima la rotazione JSON -> device da pose vere del device (CPU)
-  feat-camformer  embedding CamFormer congelato per take                             (GPU, va anche su CPU)
-  feat-egovlp     CLS EgoVLP congelato per take                                       (GPU)
-  heads           teste a 6 classi, predizioni per take, metriche, controllo pre-registrato (CPU)
-                  --eval-test: metriche e predizioni del test (una volta sola, alla fine)
-                  --skip-check: salta il controllo (solo per analisi secondarie)
-  select          sceglie sulla val variante delle pose e numero di finestre tra run candidate (CPU)
-                  --candidates DIR [DIR ...]: run fatte con heads --models camformer --skip-check
+The default config is configs/features.yaml.
 
-Uscita con codice 3 se il controllo pre-registrato fallisce: i job a valle (gate) non partono.
+Stages, in order:
+  index           take index: labels, split, folds, video, duration                (CPU)
+  traj            trajectories at 20 Hz, one per take                               (CPU)
+  check-up        (diagnostic) which way is up in the JSON poses: roll of the RGB
+                  camera and sign of the world z axis; suggests poses.json_cam_to_device (CPU)
+  check-frame     (diagnostic) estimates the JSON -> device rotation from real device poses (CPU)
+  feat-camformer  frozen CamFormer embedding per take                               (GPU, also runs on CPU)
+  feat-egovlp     frozen EgoVLP CLS per take                                         (GPU)
+  heads           6-class heads, per-take predictions, metrics, pre-registered check (CPU)
+                  --eval-test: metrics and predictions on the test split (only once, at the end)
+                  --skip-check: skip the check (only for secondary analyses)
+  select          picks on val the pose variant and the number of windows among candidate runs (CPU)
+                  --candidates DIR [DIR ...]: runs made with heads --models camformer --skip-check
+
+Exits with code 3 if the pre-registered check fails, so the downstream jobs (the gate) do not start.
 """
 
 from __future__ import annotations
@@ -33,8 +35,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.cascade.utils import feature_config as C
 from src.cascade.utils import feature_io as io
 
-# Sezioni di config da cui dipende ogni stadio. Traiettorie e feature non dipendono da split ed
-# etichette: cambiare il taglio val/test o i seed rifà solo index e heads, non il lavoro su GPU.
+# Config sections each stage depends on. Trajectories and features do not depend on the split or the
+# labels: changing the val/test cut or the seeds reruns only index and heads, not the GPU work.
 STAGE_KEYS = {
     "index": ["data", "labels", "split"],
     "traj": ["data", "poses"],
@@ -80,7 +82,7 @@ def take_windows(row, wcfg: dict):
     return compute_windows(float(row.duration_s), wcfg["length_s"], wcfg["n_windows"], wcfg["placement"])
 
 
-# ----------------------------------------------------------------------------- stadi
+# Stages
 def stage_index(cfg, run_dir, args, log):
     from src.cascade.data.takes import build_index, summary
 
@@ -160,7 +162,7 @@ def stage_traj(cfg, run_dir, args, log):
 
 
 def stage_check_up(cfg, run_dir, args, log):
-    """Senza pose del device: dove punta l'alto del mondo nel frame della camera dei JSON (vedi poses.up_statistics)."""
+    """Without device poses: where world up points in the camera frame of the JSON files (see poses.up_statistics)."""
     from src.cascade.data.poses import from_pose_json, suggest_cam_to_device, up_statistics
 
     takes = read_index(run_dir)
@@ -211,7 +213,7 @@ def stage_check_up(cfg, run_dir, args, log):
 
 
 def stage_check_frame(cfg, run_dir, args, log):
-    """Per le take con CSV e JSON stima X e W (vedi poses.estimate_frame) e ne fa la media."""
+    """For the takes with both CSV and JSON, estimate X and W (see poses.estimate_frame) and average them."""
     from src.cascade.data.poses import Trajectory, average_rotations, estimate_frame, from_aria_csv, from_pose_json
 
     takes = read_index(run_dir)
@@ -298,7 +300,8 @@ def stage_feat_camformer(cfg, run_dir, args, log):
         n_win[i] = int((owner == i).sum())
     st = pd.Series(status)
     log.info("esiti:\n%s", st.value_counts())
-    # take senza embedding: restano nelle predizioni senza cam_pred e nel gate vanno a EgoVLP (registro, audit punto 3)
+    # takes without an embedding stay in the predictions without cam_pred, and the gate sends them to EgoVLP
+    # (decision log, audit item 3)
     check_loss(int((st != "ok").sum()), len(st), ccfg.get("max_missing_frac", cfg["data"]["max_missing_frac"]), "feat-camformer")
     io.save_npz(out, take_name=takes.take_name.to_numpy().astype(str), X=X, n_windows=n_win, status=st.to_numpy().astype(str))
     io.mark_done(run_dir, "feat-camformer", key)
@@ -454,12 +457,12 @@ def pose_variant(m) -> str:
 
 
 def stage_select(cfg, run_dir, args, log):
-    """Sceglie sulla VAL la variante delle pose e il numero di finestre (registro, audit punto 1).
+    """Pick on VAL the pose variant and the number of windows (decision log, audit item 1).
 
-    Ogni candidata è una run completa fino a ``heads --models camformer --skip-check`` con la stessa config
-    salvo ``poses.json_cam_to_device`` e ``window.n_windows``. Regola pre-registrata: massima accuratezza
-    bilanciata di CamFormer sulla val; a parità meno finestre, poi l'identità. Legge solo la val: una
-    candidata con metriche del test (--eval-test) è un errore. EgoVLP usa lo stesso numero di finestre.
+    Each candidate is a full run up to ``heads --models camformer --skip-check`` with the same config except for
+    ``poses.json_cam_to_device`` and ``window.n_windows``. Pre-registered rule: highest balanced accuracy of
+    CamFormer on val; on ties fewer windows, then the identity. It reads only val: a candidate with test metrics
+    (--eval-test) is an error. EgoVLP uses the same number of windows.
     """
     import json
 
@@ -510,7 +513,7 @@ def io_json(path: Path) -> dict:
 
 
 def write_split_files(df: pd.DataFrame, dest: Path, eval_test: bool) -> None:
-    """Train e val in ``dest``; il test in ``sealed/`` accanto, solo con --eval-test (test sigillato)."""
+    """Train and val go to ``dest``; the test goes next to it in ``sealed/``, only with --eval-test (sealed test)."""
     io.write_csv(df[df.split != "test"], dest)
     sealed = dest.parent / "sealed" / dest.name
     if eval_test:

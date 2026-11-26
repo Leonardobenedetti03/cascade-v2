@@ -1,15 +1,15 @@
-"""Conteggio del costo (GMACs) della cascata.
+"""Compute cost (GMACs) of the cascade.
 
-Modello di costo per campione:
+Cost model per sample:
 
-- CamFormer (stadio 1) e il gate girano **sempre**;
-- TimeSformer-EgoVLP (stadio 2) gira solo sui campioni scalati.
+- CamFormer (stage 1 of the cascade) and the gate **always** run;
+- TimeSformer-EgoVLP (stage 2) runs only on the escalated samples.
 
-Quindi il costo medio per campione con frazione di escalation ``f`` è::
+So the mean cost per sample, with an escalation share ``f``, is::
 
     gmacs = gmacs_s1 + gate_gmacs + f * gmacs_s2
 
-Tutte le funzioni sono pure (numpy, nessun I/O).
+All functions are pure (numpy, no I/O).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from typing import Dict, Optional
 
 import numpy as np
 
-# Tolleranza relativa per i confronti col budget (evita che 0.1*3 != 0.3 scarti un'escalation).
+# Relative tolerance for the comparisons with the budget (so that 0.1*3 != 0.3 does not drop an escalation).
 _REL_TOL = 1e-9
 
 
@@ -30,7 +30,7 @@ def _check_non_negative(**costs: float) -> None:
 
 
 def macs_to_gmacs(macs: float) -> float:
-    """Converte un numero di MAC in GMACs (1 GMAC = 1e9 MAC)."""
+    """Convert a number of MACs to GMACs (1 GMAC = 1e9 MAC)."""
     _check_non_negative(macs=macs)
     return float(macs) / 1e9
 
@@ -41,13 +41,13 @@ def cascade_gmacs(
     gmacs_s2: float,
     gate_gmacs: float = 0.0,
 ) -> float:
-    """Costo medio per campione della cascata, in GMACs.
+    """Mean cost per sample of the cascade, in GMACs.
 
     Args:
-        escalated: array 1D booleano (o 0/1), True se il campione va allo stadio 2.
-        gmacs_s1: costo per campione di CamFormer.
-        gmacs_s2: costo per campione di TimeSformer-EgoVLP.
-        gate_gmacs: costo per campione del gate.
+        escalated: 1D boolean (or 0/1) array, True if the sample goes to stage 2.
+        gmacs_s1: cost per sample of CamFormer.
+        gmacs_s2: cost per sample of TimeSformer-EgoVLP.
+        gate_gmacs: cost per sample of the gate.
     """
     _check_non_negative(gmacs_s1=gmacs_s1, gmacs_s2=gmacs_s2, gate_gmacs=gate_gmacs)
     esc = np.asarray(escalated)
@@ -66,11 +66,11 @@ def max_escalations(
     gmacs_s2: float,
     gate_gmacs: float = 0.0,
 ) -> int:
-    """Massimo numero di campioni (su ``n``) scalabili restando nel budget medio.
+    """Largest number of samples (out of ``n``) we can escalate while staying within the mean budget.
 
     Raises:
-        ValueError: se il budget è sotto il costo minimo (stadio 1 + gate),
-            che si paga comunque su ogni campione.
+        ValueError: if the budget is below the minimum cost (stage 1 + gate), which is paid on every
+            sample anyway.
     """
     _check_non_negative(gmacs_s1=gmacs_s1, gmacs_s2=gmacs_s2, gate_gmacs=gate_gmacs)
     if n <= 0:
@@ -86,22 +86,21 @@ def max_escalations(
 
 
 def relative_cost(gmacs: float, gmacs_reference: float) -> float:
-    """Costo relativo a un riferimento (es. TimeSformer da solo): ``gmacs / gmacs_reference``."""
+    """Cost relative to a reference (e.g. TimeSformer alone): ``gmacs / gmacs_reference``."""
     _check_non_negative(gmacs=gmacs, gmacs_reference=gmacs_reference)
     if gmacs_reference == 0:
         raise ValueError("gmacs_reference deve essere > 0")
     return gmacs / gmacs_reference
 
 
-# --------------------------------------------------------------------------- misura (stadio 40)
+# Measuring the cost (stage 40)
 def camformer_macs(T: int, arch, n_classes: int) -> int:
-    """MAC analitici di un forward di CamFormer (batch 1, ``T`` pose, ``pooling='no'``).
+    """Analytic MACs of one CamFormer forward pass (batch 1, ``T`` poses, ``pooling='no'``).
 
-    Dal codice di ``seeing_without_pixels/models/cm_encoder.py``: proiezione della posa
-    (9 dim con ``rel9d_grav``, più il token di gravità proiettato a parte), ``num_layers``
-    strati transformer su ``n = T (+1)`` token (QKV, punteggi e somma pesata
-    dell'attenzione, proiezione d'uscita, FFN), ``out_proj`` su tutti i T token, testa.
-    Norme e softmax escluse (come nei contatori).
+    From the code in ``seeing_without_pixels/models/cm_encoder.py``: pose projection (9 dims with ``rel9d_grav``,
+    plus the gravity token projected separately), ``num_layers`` transformer layers on ``n = T (+1)`` tokens (QKV,
+    attention scores and weighted sum, output projection, FFN), ``out_proj`` on all T tokens, head.
+    Norms and softmax are left out (as in the counters).
     """
     d, L, ff, D = arch.d_model, arch.num_layers, arch.dim_feedforward, arch.output_dim
     grav = 1 if arch.pose_encoding == "rel9d_grav" else 0
@@ -114,12 +113,11 @@ def camformer_macs(T: int, arch, n_classes: int) -> int:
 
 
 def timesformer_macs(arch, num_frames: int) -> int:
-    """MAC analitici del ramo video di EgoVLP (SpaceTimeTransformer + vid_proj), batch 1.
+    """Analytic MACs of the EgoVLP video branch (SpaceTimeTransformer + vid_proj), batch 1.
 
-    Da ``EgoVLP/model/video_transformer.py``: patch embedding; per blocco un'attenzione
-    temporale (gruppi = patch per frame, F token + CLS) e una spaziale (gruppi = frame,
-    P token + CLS), ciascuna con QKV, CLS che attende tutti gli N token, gruppi e
-    proiezione; MLP con rapporto 4.
+    From ``EgoVLP/model/video_transformer.py``: patch embedding; for each block a temporal attention (groups =
+    patches per frame, F tokens + CLS) and a spatial one (groups = frames, P tokens + CLS), each with QKV, the CLS
+    attending to all N tokens, the groups and the projection; MLP with ratio 4.
     """
     d, p, img, depth = arch.embed_dim, arch.patch_size, arch.img_size, arch.depth
     P = (img // p) ** 2
@@ -143,8 +141,8 @@ def _sdpa_macs(q_shape, k_shape, v_shape) -> int:
 
 
 def _count_torch(model, inputs: tuple) -> float:
-    """MAC con ``torch.utils.flop_counter`` (FLOP / 2), con le varianti SDPA mappate a mano:
-    alcune versioni di torch (es. 2.8 su CPU) non le contano e sottostimano l'attenzione."""
+    """MACs from ``torch.utils.flop_counter`` (FLOPs / 2), with the SDPA variants mapped by hand: some torch
+    versions (e.g. 2.8 on CPU) do not count them and underestimate the attention."""
     import torch
     from torch.utils.flop_counter import FlopCounterMode
 
@@ -163,7 +161,7 @@ def _count_torch(model, inputs: tuple) -> float:
             mapping[op] = sdpa_flops
     try:
         mode = FlopCounterMode(display=False, custom_mapping=mapping)
-    except TypeError:  # torch senza custom_mapping
+    except TypeError:  # torch without custom_mapping
         mode = FlopCounterMode(display=False)
     with torch.no_grad(), mode as fc:
         model(*inputs)
@@ -171,8 +169,8 @@ def _count_torch(model, inputs: tuple) -> float:
 
 
 def _count_fvcore(model, inputs: tuple):
-    """MAC con fvcore (un'operazione per multiply-add), con handle per SDPA: fvcore non la
-    conta, e CamFormer (nn.MultiheadAttention senza fast path) passa da lì."""
+    """MACs from fvcore (one op per multiply-add), with a handle for SDPA: fvcore does not count it, and
+    CamFormer (nn.MultiheadAttention without the fast path) goes through it."""
     import torch
     from fvcore.nn import FlopCountAnalysis
     from fvcore.nn.jit_handles import get_shape
@@ -191,13 +189,12 @@ def _count_fvcore(model, inputs: tuple):
 def measure_gmacs(
     model, inputs: tuple, counter: str = "fvcore", analytic_macs: Optional[int] = None, tol: float = 0.02
 ) -> dict:
-    """GMACs di un forward a batch 1: fvcore, ``torch.utils.flop_counter`` e formula analitica.
+    """GMACs of one forward pass at batch 1: fvcore, ``torch.utils.flop_counter`` and the analytic formula.
 
-    Il fast path di ``nn.TransformerEncoderLayer`` (CamFormer in eval) nasconde quasi
-    tutte le operazioni ai contatori, quindi durante il conteggio è disattivato.
-    ``gmacs`` è il valore di ``counter`` (``fvcore`` | ``torch`` | ``analytic``), con
-    fallback se quel contatore fallisce. Se un contatore si scosta dalla formula
-    analitica più di ``tol`` viene segnalato nel log.
+    The fast path of ``nn.TransformerEncoderLayer`` (CamFormer in eval mode) hides almost every op from the
+    counters, so we turn it off while counting. ``gmacs`` is the value from ``counter`` (``fvcore`` | ``torch`` |
+    ``analytic``), with a fallback if that counter fails. If a counter is more than ``tol`` away from the
+    analytic formula, we say so in the log.
     """
     import logging
 
@@ -209,7 +206,7 @@ def measure_gmacs(
     try:
         prev = torch.backends.mha.get_fastpath_enabled()
         torch.backends.mha.set_fastpath_enabled(False)
-    except AttributeError:  # torch vecchio: niente setter
+    except AttributeError:  # old torch: no setter
         pass
     out: Dict[str, object] = {"gmacs_analytic": macs_to_gmacs(analytic_macs) if analytic_macs else None}
     try:
@@ -217,7 +214,7 @@ def measure_gmacs(
         try:
             total, unsupported = _count_fvcore(model, inputs)
             out.update({"gmacs_fvcore": macs_to_gmacs(total), "unsupported_ops": unsupported})
-        except Exception as e:  # noqa: BLE001 - fvcore non traccia tutti i modelli
+        except Exception as e:  # noqa: BLE001 - fvcore cannot trace every model
             log.warning("fvcore non riesce a contare il modello (%s: %s)", type(e).__name__, e)
             out.update({"gmacs_fvcore": None, "fvcore_error": f"{type(e).__name__}: {e}"})
     finally:

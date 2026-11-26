@@ -9,7 +9,7 @@ def _poses(n=200, fps=20.0, f=1.5, amp=0.05, vx=0.0, yaw_rate=0.0):
     t = np.arange(n) / fps
     p = np.zeros((n, 7))
     p[:, 0] = vx * t
-    p[:, 2] = 1.6 + amp * np.sin(2 * np.pi * f * t) + 0.01 * t  # con trend lineare
+    p[:, 2] = 1.6 + amp * np.sin(2 * np.pi * f * t) + 0.01 * t  # with a linear trend
     p[:, 3:] = Rotation.from_euler("z", (yaw_rate * t)[:, None]).as_quat()
     return p
 

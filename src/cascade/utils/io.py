@@ -1,11 +1,9 @@
-"""Scritture atomiche: file temporaneo con nome univoco nella stessa cartella, poi rename.
+"""Atomic writes: a temporary file with a unique name in the same folder, then a rename.
 
-Un processo interrotto a metà scrittura lascia al massimo un ``.tmp`` orfano, mai un
-output troncato con il nome definitivo. Il nome temporaneo è univoco per processo,
-quindi anche job concorrenti (array SLURM) che scrivono lo stesso file non si
-corrompono a vicenda: vince l'ultimo rename, e ogni rename porta un file completo.
-Il suffisso finale viene preservato (``np.save``/``np.savez``/``savefig`` lo usano per
-decidere il formato).
+A process killed halfway through a write leaves at most an orphan ``.tmp``, never a truncated output with
+the final name. The temporary name is unique per process, so concurrent jobs (SLURM arrays) writing the same
+file do not corrupt each other: the last rename wins, and every rename brings a complete file.
+We keep the final suffix, because ``np.save``/``np.savez``/``savefig`` use it to pick the format.
 """
 
 from __future__ import annotations
@@ -22,7 +20,7 @@ import numpy as np
 
 @contextlib.contextmanager
 def atomic_path(path: Path) -> Iterator[Path]:
-    """Restituisce un percorso temporaneo; al termine senza errori lo rinomina in ``path``."""
+    """Yield a temporary path, and rename it to ``path`` if the block ends without errors."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp{path.suffix}")

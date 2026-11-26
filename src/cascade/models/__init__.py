@@ -1,1 +1,1 @@
-"""Wrapper dei due livelli: CamFormer (L0) e TimeSformer-EgoVLP (L1)."""
+"""Wrappers for the two levels, CamFormer (L0) and TimeSformer-EgoVLP (L1), plus the gates."""

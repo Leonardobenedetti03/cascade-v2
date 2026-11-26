@@ -1,11 +1,11 @@
-"""CamFormer congelato: embedding a 512 per finestra (stadio ``feat-camformer``).
+"""Frozen CamFormer: one 512-d embedding per window (stage ``feat-camformer``).
 
-Encoder e preprocessing vengono dal repository ufficiale (``camformer.repo``), importati per percorso:
-``models/cm_encoder.py::CameraPoseSeqEncoder`` con ``pooling='no'`` e
-``utils/dataset_utils.py::transform_camera_pose``, come ``tasks/pretrain_longseq.py``:
-in ingresso il contesto ``context_s`` centrato sulla finestra (pose relative al suo campione centrale,
-6D + traslazione, più la gravità nel frame della camera), poi media dei token della sola finestra.
-I pesi si caricano come ``init_ckpt`` del loro codice (prefisso ``model.`` tolto, encoder completo).
+Encoder and preprocessing come from the official repository (``camformer.repo``), imported by path:
+``models/cm_encoder.py::CameraPoseSeqEncoder`` with ``pooling='no'`` and
+``utils/dataset_utils.py::transform_camera_pose``, as in ``tasks/pretrain_longseq.py``.
+The input is the context ``context_s`` centred on the window (poses relative to its central sample,
+6D + translation, plus gravity in the camera frame). We then average the tokens of the window only.
+The weights are loaded the way their code loads ``init_ckpt`` (``model.`` prefix removed, full encoder).
 """
 
 from __future__ import annotations
@@ -73,10 +73,10 @@ def load_weights(model, ckpt: Path) -> None:
 
 
 def window_input(traj: Trajectory, t_start: float, t_end: float, context_s: float, min_coverage: float, transform, enc_id: int) -> Optional[dict]:
-    """Input del modello per una finestra, o None se la copertura della finestra è insufficiente.
+    """Model input for one window, or None if the window is not covered well enough.
 
-    Contesto = ``[c - ctx/2, c + ctx/2)`` con c centro della finestra (mai più corto della finestra);
-    i token di pooling sono quelli in ``[t_start, t_end)``.
+    Context = ``[c - ctx/2, c + ctx/2)``, with c the centre of the window (never shorter than the window).
+    The pooled tokens are the ones in ``[t_start, t_end)``.
     """
     c = 0.5 * (t_start + t_end)
     half = 0.5 * max(context_s, t_end - t_start)
@@ -95,7 +95,7 @@ def window_input(traj: Trajectory, t_start: float, t_end: float, context_s: floa
 
 
 def embed(model, items: List[dict], batch_size: int, device) -> np.ndarray:
-    """Embedding ``[len(items), D]``: media dei token della finestra (come ``encode_motion``)."""
+    """Embeddings ``[len(items), D]``: mean of the window tokens (like ``encode_motion``)."""
     import torch
     from torch.nn.utils.rnn import pad_sequence
 
@@ -108,7 +108,7 @@ def embed(model, items: List[dict], batch_size: int, device) -> np.ndarray:
             lengths = torch.tensor([len(s) for s in seqs])
             x = pad_sequence(seqs, batch_first=True).to(device)
             pad = (torch.arange(x.shape[1])[None, :] >= lengths[:, None]).to(device)
-            feats = model(x, pad, lengths.to(device))  # [B, T, D], token di gravità già tolto
+            feats = model(x, pad, lengths.to(device))  # [B, T, D], gravity token already removed
             for j, it in enumerate(b):
                 out.append(feats[j, it["win_start"] : it["win_end"]].mean(0).cpu().numpy())
     return np.stack(out) if out else np.zeros((0, 0), np.float32)

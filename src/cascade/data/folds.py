@@ -1,4 +1,4 @@
-"""Partizioni del gate v2: stratificate per classe, raggruppate per sessione (nessuna sessione in due fold)."""
+"""Folds for the gate v2: stratified by class and grouped by session, so no session is split across folds."""
 
 from __future__ import annotations
 
@@ -8,10 +8,11 @@ import numpy as np
 
 
 def session_folds(y: np.ndarray, sessions: np.ndarray, n_folds: int, seed: int) -> np.ndarray:
-    """Fold ``[N]`` in ``0..K-1`` con ``StratifiedGroupKFold`` (classe = ``y``, gruppo = sessione).
+    """Fold ``[N]`` in ``0..K-1`` from ``StratifiedGroupKFold`` (class = ``y``, group = session).
 
-    Una sessione con take di più classi va dove la stratificazione la mette, intera. Le classi con meno
-    sessioni che fold non compaiono in tutte le fold (avviso di scikit-learn, silenziato: è atteso)."""
+    A session with takes of several classes goes, as a whole, wherever the stratification puts it. Classes with
+    fewer sessions than folds cannot appear in every fold. scikit-learn warns about this; we expect it, so we
+    silence the warning."""
     from sklearn.model_selection import StratifiedGroupKFold
 
     y = np.asarray(y)
@@ -31,7 +32,7 @@ def session_folds(y: np.ndarray, sessions: np.ndarray, n_folds: int, seed: int) 
 
 
 def check_grouping(fold: np.ndarray, sessions: np.ndarray) -> None:
-    """Errore se una sessione compare in più di una fold."""
+    """Raise an error if a session appears in more than one fold."""
     s = np.asarray(sessions).astype(str)
     per = {}
     for f, g in zip(fold, s):

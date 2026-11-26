@@ -1,8 +1,8 @@
-"""EgoVLP congelato: CLS a 768 per finestra (stadio ``feat-egovlp``).
+"""Frozen EgoVLP: one 768-d CLS per window (stage ``feat-egovlp``).
 
-Ramo video di ``EgoVLP/model/model.py::FrozenInTime``: SpaceTimeTransformer (copia in ``vendor/``,
-identica a quella di cascade v2) con head/pre_logits/fc = Identity; i nomi coincidono con quelli del
-checkpoint, che si carica dopo aver tolto ``module.``. Ingresso ``[B, T, 3, H, W]`` normalizzato ImageNet.
+Video branch of ``EgoVLP/model/model.py::FrozenInTime``: SpaceTimeTransformer (copy in ``vendor/``, the same
+as in cascade v2) with head/pre_logits/fc = Identity. Module names match the checkpoint, which we load after
+removing ``module.``. Input ``[B, T, 3, H, W]``, ImageNet-normalised.
 """
 
 from __future__ import annotations
@@ -41,14 +41,14 @@ def build_model(ecfg: dict):
             self.vid_proj = nn.Sequential(nn.Linear(ecfg["embed_dim"], ecfg["proj_dim"]))
 
         def forward(self, x):
-            return self.video_model(x)  # CLS [B, 768], prima della proiezione
+            return self.video_model(x)  # CLS [B, 768], before the projection
 
     return EgoVLPVideo()
 
 
 def _tolerant_pickle():
-    """``pickle`` che sostituisce le classi non importabili (es. ``parse_config.ConfigParser`` salvato
-    nel checkpoint EgoVLP) con un segnaposto: serve solo lo ``state_dict``."""
+    """``pickle`` replacement that swaps classes it cannot import (e.g. ``parse_config.ConfigParser``, saved in
+    the EgoVLP checkpoint) for a placeholder. We only need the ``state_dict``."""
     import pickle
     import types
 
@@ -80,7 +80,7 @@ def load_weights(model, ckpt: Path) -> None:
     sd = {k[len("module.") :] if k.startswith("module.") else k: v for k, v in sd.items()}
     own = model.state_dict()
     key = "video_model.temporal_embed"
-    if key in sd and key in own and sd[key].shape != own[key].shape:  # come _inflate_positional_embeds ('zeros')
+    if key in sd and key in own and sd[key].shape != own[key].shape:  # like _inflate_positional_embeds ('zeros')
         loaded, cur = sd[key], own[key]
         new = torch.zeros_like(cur)
         n = min(loaded.shape[1], cur.shape[1])
@@ -94,7 +94,7 @@ def load_weights(model, ckpt: Path) -> None:
 
 
 def normalize(frames_uint8: np.ndarray, mean: Sequence[float], std: Sequence[float]):
-    """uint8 ``[B, T, H, W, 3]`` -> float ``[B, T, 3, H, W]`` normalizzato."""
+    """uint8 ``[B, T, H, W, 3]`` -> normalised float ``[B, T, 3, H, W]``."""
     import torch
 
     x = torch.from_numpy(np.ascontiguousarray(frames_uint8)).float().div_(255.0).permute(0, 1, 4, 2, 3)
@@ -104,7 +104,7 @@ def normalize(frames_uint8: np.ndarray, mean: Sequence[float], std: Sequence[flo
 
 
 class WindowFrames:
-    """Dataset torch: una voce per (take, finestra), frame già preprocessati ``[4, 224, 224, 3]``."""
+    """Torch dataset: one item per (take, window), frames already preprocessed ``[4, 224, 224, 3]``."""
 
     def __init__(self, items: List[Dict], ecfg: dict) -> None:
         self.items = items
@@ -122,7 +122,7 @@ class WindowFrames:
             raw = decode_at(it["video_path"], times)
             fr = preprocess(raw, e["pre_resize"], e["crop"], e["size"])
             ok = True
-        except Exception as ex:  # noqa: BLE001 - una clip illeggibile non ferma lo stadio
+        except Exception as ex:  # noqa: BLE001 - an unreadable clip does not stop the stage
             log.warning("%s: decodifica fallita (%s)", it["video_path"], ex)
             fr = np.zeros((len(e["frame_indices"]), e["size"], e["size"], 3), np.uint8)
             ok = False

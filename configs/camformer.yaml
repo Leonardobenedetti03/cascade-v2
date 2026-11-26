@@ -1,4 +1,4 @@
-# L0: CamFormer (third_party/seeing_without_pixels). Architettura dal paper / train.py.
+# L0: CamFormer (third_party/seeing_without_pixels). Architecture from the paper / train.py.
 camformer:
   arch:
     d_model: 128
@@ -8,20 +8,20 @@ camformer:
     dropout: 0.1
     output_dim: 512
     pose_encoding: rel9d_grav
-  # Contesto in ingresso al transformer; il mean-pool si fa solo sulla finestra centrale.
-  # null = uguale a data.window_s. TODO(HPC): quale contesto riproduce ~71%?
+  # Context fed to the transformer; the mean pool runs only over the central window.
+  # null = same as data.window_s.
   context_s: null
-  # M17 (sostituisce M04): encoder dal checkpoint del paper (paths.camformer_ckpt, egoexo4d_dur8.pt,
-  # pose_encoding rel9d_grav, contesto 8 s = data.window_s), congelato; si allena solo la testa lineare.
-  # Limite dichiarato: il pretraining ha visto circa il 95% delle take di train e val.
+  # M17 (replaces M04): encoder from the paper's checkpoint (paths.camformer_ckpt, egoexo4d_dur8.pt,
+  # pose_encoding rel9d_grav, 8 s context = data.window_s), frozen; we train only the linear head.
+  # Known limit: pre-training saw about 95% of the train and val takes.
   pretrained: true
   freeze_encoder: true
-  init_head_from_ckpt: false     # usa cls_model del checkpoint se presente (stesso ordine classi)
-  eval_source: fold_ensemble     # val/test: media dei 5 modelli di fold | full
-  mc_dropout_passes: 0           # >0 abilita le colonne MC dropout
+  init_head_from_ckpt: false     # use the checkpoint's cls_model if present (same class order)
+  eval_source: fold_ensemble     # val/test: mean of the 5 fold models | full
+  mc_dropout_passes: 0           # >0 turns on the MC dropout columns
   batch_size_eval: 256
   device: auto
-  # Iperparametri dell'addestramento (con freeze_encoder conta solo il gruppo della testa: lr × head_lr_mult).
+  # Training hyperparameters (with freeze_encoder only the head group matters: lr × head_lr_mult).
   train:
     optimizer: adamw
     lr: 1.0e-4
@@ -30,7 +30,7 @@ camformer:
     epochs: 50                   # M15 (D3)
     batch_size: 64
     patience: 8                  # M15 (D3)
-    monitor: val_loss            # val_loss | val_acc (sull'holdout interno)
+    monitor: val_loss            # val_loss | val_acc (on the inner holdout)
     temporal_jitter_s: 0.0
     num_workers: 4
     pin_memory: true

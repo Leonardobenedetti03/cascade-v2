@@ -1,17 +1,17 @@
-"""Feature di moto (gruppo C del gate), in numpy, dalla traiettoria della finestra.
+"""Motion features (gate group C), computed with numpy from the trajectory of a window.
 
-Input: pose ``[N, 7]`` (tx, ty, tz, qx, qy, qz, qw nel mondo) campionate a ``fps``.
+Input: poses ``[N, 7]`` (tx, ty, tz, qx, qy, qz, qw in the world frame) sampled at ``fps``.
 
-Feature:
-- ``mot_speed_mean``, ``mot_speed_std``: velocità di traslazione [m/s];
-- ``mot_angvel_mean``, ``mot_angvel_std``: velocità angolare [rad/s];
-- ``mot_jerk_mean``: norma media della derivata terza della posizione [m/s³];
-- ``mot_vert_range``: escursione verticale robusta (p95 − p5) [m];
-- ``mot_energy``: energia totale del moto, ``mean(v²) + mean(ω²)``;
-- ``mot_zfreq_dom``: frequenza dominante della quota (FFT dopo detrend lineare) [Hz];
-- ``mot_zfreq_peak``: potenza del picco / potenza totale (DC esclusa), in [0, 1].
+Features:
+- ``mot_speed_mean``, ``mot_speed_std``: translation speed [m/s];
+- ``mot_angvel_mean``, ``mot_angvel_std``: angular speed [rad/s];
+- ``mot_jerk_mean``: mean norm of the third derivative of the position [m/s³];
+- ``mot_vert_range``: robust vertical range (p95 − p5) [m];
+- ``mot_energy``: total motion energy, ``mean(v²) + mean(ω²)``;
+- ``mot_zfreq_dom``: dominant frequency of the height (FFT after a linear detrend) [Hz];
+- ``mot_zfreq_peak``: peak power over total power (DC excluded), in [0, 1].
 
-Con meno di ``MIN_SAMPLES`` campioni le feature sono NaN (il gate le imputa).
+With fewer than ``MIN_SAMPLES`` samples the features are NaN, and the gate imputes them.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def _angular_speed(quats: np.ndarray, fps: float) -> np.ndarray:
 
 
 def dominant_frequency(x: np.ndarray, fps: float):
-    """(frequenza dominante [Hz], forza relativa del picco) dopo detrend lineare."""
+    """(dominant frequency [Hz], relative strength of the peak) after a linear detrend."""
     n = len(x)
     t = np.arange(n)
     coef = np.polyfit(t, x, 1)
@@ -54,7 +54,7 @@ def dominant_frequency(x: np.ndarray, fps: float):
     if total <= 0:
         return 0.0, 0.0
     k = int(np.argmax(power))
-    # interpolazione parabolica del picco per una frequenza sub-bin
+    # parabolic interpolation around the peak, to get a frequency between two bins
     if 0 < k < len(power) - 1:
         a, b, c = np.log(power[k - 1] + 1e-30), np.log(power[k] + 1e-30), np.log(power[k + 1] + 1e-30)
         denom = a - 2 * b + c

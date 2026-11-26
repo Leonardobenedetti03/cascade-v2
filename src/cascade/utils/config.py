@@ -1,11 +1,15 @@
-"""Configurazione: YAML in ``configs/`` → dataclass tipizzate.
+"""Configuration: the YAML files in ``configs/`` become typed dataclasses.
 
-Ordine di merge (l'ultimo vince):
+Merge order (the last one wins):
 ``base.yaml`` → ``camformer.yaml`` → ``egovlp.yaml`` → ``gate.yaml`` → ``gate_v2.yaml`` →
-``synthetic.yaml`` (solo con ``--synthetic``) → file passati con ``--config`` →
-override ``--set sezione.chiave=valore`` (valore parsato come YAML).
+``synthetic.yaml`` (only with ``--synthetic``) → files given with ``--config`` →
+overrides ``--set section.key=value`` (the value is parsed as YAML).
 
-Le chiavi sconosciute sono un errore: un refuso nel YAML non deve passare in silenzio.
+Unknown keys are an error, so a typo in a YAML file never goes unnoticed.
+
+Some sections (frames, fusion, cost_e2e, site_diag, ...) belong to stages of our first pipeline, which is now
+only in the development history (tag ``archive/development``). We kept them so the config loads exactly as
+it did for the runs in the report.
 """
 
 from __future__ import annotations
@@ -23,11 +27,11 @@ BASE_FILES = ("base.yaml", "camformer.yaml", "egovlp.yaml", "gate.yaml", "gate_v
 SYNTHETIC_FILE = "synthetic.yaml"
 
 
-# --------------------------------------------------------------------------- sezioni
+# Config sections
 @dataclass
 class PathsCfg:
     scenario_csv: str = "{repo}/third_party/seeing_without_pixels/data_files/egoexo4d/scenario_cls.csv"
-    split_sha256: Optional[str] = None  # SHA256 di scenario_csv: entra nei manifest (M07)
+    split_sha256: Optional[str] = None  # SHA256 of scenario_csv, written into the manifests (M07)
     takes_json: str = "{data}/egoexo4d/takes.json"
     takes_root: str = "{data}/egoexo4d/takes"
     video_pattern: str = "{takes_root}/{take_name}/frame_aligned_videos/downscaled/448/aria01_214-1.mp4"
@@ -39,8 +43,8 @@ class PathsCfg:
     frame_baseline_ckpt: str = "{data}/checkpoints/torchvision/mobilenet_v3_small-047dcff4.pth"
     frames_dir: str = "{run}/10_frames"
     traj_cache_dir: str = "{run}/traj_cache"
-    traj_dir: str = "{run}/01_traj"  # uscita dello stadio 01 (M08): un <take_name>.npz per take
-    pose_roots: List[str] = field(default_factory=list)  # radici del dataset con split_manifest.csv (stadio 01)
+    traj_dir: str = "{run}/01_traj"  # output of stage 01 (M08): one <take_name>.npz per take
+    pose_roots: List[str] = field(default_factory=list)  # dataset roots that contain split_manifest.csv (stage 01)
 
 
 @dataclass
@@ -48,17 +52,17 @@ class DataCfg:
     window_s: float = 8.0
     n_windows: int = 1
     window_stride_s: Optional[float] = None
-    window_placement: str = "center"  # center | uniform (K finestre su tutta la take)
+    window_placement: str = "center"  # center | uniform (K windows over the whole take)
     duration_source: str = "takes_json"  # takes_json | video | trajectory
     traj_source: str = "aria_csv"  # aria_csv | converted_npz | camformer_npz
     traj_fps: float = 20.0
-    pose_src_fps: float = 30.0  # frequenza delle pose per frame di Ego-Exo4D (stadio 01)
-    pose_max_gap_frames: int = 15  # buchi sorgente più lunghi: nessuna traiettoria (stadio 01)
+    pose_src_fps: float = 30.0  # rate of the per-frame poses in Ego-Exo4D (stage 01)
+    pose_max_gap_frames: int = 15  # longer gaps in the source: no trajectory (stage 01)
     min_traj_coverage: float = 0.9
-    vertical_axis: int = 2  # asse "su" nel mondo Aria (z)
-    out_of_range: str = "drop"  # drop | clamp: finestra oltre video/traiettoria
-    short_take: str = "keep"  # keep | drop: take più corte della finestra
-    max_missing_frac: float = 0.02  # clip perse tra stadi oltre cui fermarsi
+    vertical_axis: int = 2  # "up" axis in the Aria world frame (z)
+    out_of_range: str = "drop"  # drop | clamp: window that goes past the video or the trajectory
+    short_take: str = "keep"  # keep | drop: takes shorter than the window
+    max_missing_frac: float = 0.02  # clips lost between stages above which we stop
     expected_split_counts: Optional[Dict[str, int]] = field(default_factory=dict)
 
 
@@ -77,9 +81,9 @@ class FramesCfg:
     pre_resize: int = 256
     crop: int = 256
     size: int = 224
-    pre_resize_mode: str = "bicubic"  # come lo scale di ffmpeg usato da EgoVLP
+    pre_resize_mode: str = "bicubic"  # like the ffmpeg scale used by EgoVLP
     pre_resize_antialias: bool = True
-    final_antialias: bool = False  # torchvision 0.13 (EgoVLP): niente antialias sui tensori
+    final_antialias: bool = False  # torchvision 0.13 (EgoVLP): no antialias on tensors
     rotate_k90: int = 0
     decoder: str = "auto"  # auto | decord | pyav
 
@@ -90,7 +94,7 @@ class FoldsCfg:
     inner_holdout_frac: float = 0.1
     seed: int = 0
     group_by: str = "take"  # take | site (M03)
-    site_map: Optional[str] = None  # sito -> fold: split.json versionato, non ricalcolato (D6)
+    site_map: Optional[str] = None  # site -> fold: split.json kept in git, not recomputed (D6)
 
 
 @dataclass
@@ -126,12 +130,12 @@ class CamformerTrain:
 class CamformerCfg:
     arch: CamformerArch = field(default_factory=CamformerArch)
     train: CamformerTrain = field(default_factory=CamformerTrain)
-    context_s: Optional[float] = None  # None = uguale alla finestra
+    context_s: Optional[float] = None  # None = same as the window
     pretrained: bool = True
-    freeze_encoder: bool = False  # M17: encoder del checkpoint congelato, si allena solo la testa
+    freeze_encoder: bool = False  # M17: the checkpoint encoder stays frozen, we only train the head
     init_head_from_ckpt: bool = False
     eval_source: str = "fold_ensemble"  # fold_ensemble | full
-    seed: Optional[int] = None  # seed del fine-tuning (None = seed globale)
+    seed: Optional[int] = None  # fine-tuning seed (None = global seed)
     mc_dropout_passes: int = 0
     batch_size_eval: int = 256
     device: str = "auto"
@@ -174,18 +178,18 @@ class EgovlpCfg:
 class FrameBaselineCfg:
     enabled: bool = False
     arch: str = "mobilenet_v3_small"
-    frame_index: int = 8  # frame dei 16 estratti (centro della finestra)
+    frame_index: int = 8  # which of the 16 extracted frames (the center of the window)
     size: int = 112
     pretrained: bool = True
     batch_size: int = 64
     device: str = "auto"
-    w_grid_step: float = 0.1  # griglia per le fusioni con L½ (stadio 45)
-    r_step: int = 5  # griglia (r1, r2) della cascata a tre livelli
+    w_grid_step: float = 0.1  # grid for the fusions with L½ (stage 45)
+    r_step: int = 5  # (r1, r2) grid of the three-level cascade
 
 
 @dataclass
 class HeadsCfg:
-    source: str = "probe"  # probe (25 + logistica) | finetune (stadio 26)
+    source: str = "probe"  # probe (25 + logistic regression) | finetune (stage 26)
     Cs: List[float] = field(default_factory=lambda: [0.01, 0.1, 1.0, 10.0])
     inner_cv: int = 3
     max_iter: int = 2000
@@ -193,7 +197,7 @@ class HeadsCfg:
 
 @dataclass
 class FusionCfg:
-    mode: str = "replace"  # replace (L1 sostituisce L0, M05) | fuse (log-lineare, ablation)
+    mode: str = "replace"  # replace (L1 replaces L0, M05) | fuse (log-linear, ablation)
     w_grid_step: float = 0.05
 
 
@@ -203,14 +207,14 @@ class CostCfg:
     latency_reps: int = 20
     gate_gmacs: float = 0.0
     counter: str = "fvcore"  # fvcore | torch
-    override_gmacs: Optional[Dict[str, float]] = None  # {L0: ..., L1: ...}: solo per --synthetic
+    override_gmacs: Optional[Dict[str, float]] = None  # {L0: ..., L1: ...}: only for --synthetic
     device: str = "auto"
     expected: Optional[Dict[str, float]] = field(default_factory=dict)
 
 
 @dataclass
 class CompareCfg:
-    """CompareConfidence (M06): regressione logistica che stima P(L1 ha ragione | z)."""
+    """CompareConfidence (M06): logistic regression that estimates P(L1 is right | z)."""
 
     Cs: List[float] = field(default_factory=lambda: [0.001, 0.01, 0.1, 1.0, 10.0])
     inner_cv: int = 3
@@ -229,47 +233,47 @@ class GateCfg:
     seeds: List[int] = field(default_factory=lambda: [0, 1, 2])
     r_step: int = 1
     budgets: List[float] = field(default_factory=lambda: [0.25, 0.5])
-    within_pts: float = 0.01  # "entro 1 punto da always_L1" (costo minimo, curva di Pareto)
-    improvement_deltas: List[float] = field(default_factory=lambda: [0.0, 0.01])  # δ di I(δ) (M09)
-    bacc_min_takes: int = 5  # accuratezza bilanciata: classi con almeno tante take nello split (M14)
-    transfer_budgets: List[float] = field(default_factory=lambda: [0.25, 0.5])  # soglie val → test (RQ1)
+    within_pts: float = 0.01  # "within 1 point of always_L1" (minimum cost, Pareto curve)
+    improvement_deltas: List[float] = field(default_factory=lambda: [0.0, 0.01])  # δ in I(δ) (M09)
+    bacc_min_takes: int = 5  # balanced accuracy: classes with at least this many takes in the split (M14)
+    transfer_budgets: List[float] = field(default_factory=lambda: [0.25, 0.5])  # thresholds val → test (RQ1)
     operating_budget: float = 0.5
-    operating_rule: str = "budget"  # budget | within_pts (N28: minimo costo entro within_pts da always_L1 su val)
+    operating_rule: str = "budget"  # budget | within_pts (N28: lowest cost within within_pts of always_L1 on val)
     bootstrap: int = 1000
     bootstrap_seed: int = 0
-    # N37: unità del bootstrap (take | session) e gruppi della CV interna dei gate (take | session).
-    # Con session e senza colonna session nella cache si torna alla take, con un avviso nel log.
+    # N37: bootstrap unit (take | session) and groups of the gates' inner CV (take | session).
+    # With session but no session column in the cache we fall back to take, with a warning in the log.
     bootstrap_unit: str = "take"
     inner_cv_groups: str = "take"
-    comparisons: List[List[str]] = field(default_factory=list)  # coppie [A, B] per A − B (RQ2)
-    reference: List[str] = field(default_factory=list)  # gate per la cascata per classe
+    comparisons: List[List[str]] = field(default_factory=list)  # pairs [A, B] for A − B (RQ2)
+    reference: List[str] = field(default_factory=list)  # gate for the per-class cascade
     compare: CompareCfg = field(default_factory=CompareCfg)
 
 
 @dataclass
 class GateV2HeadsCfg:
-    """Teste lineari rifatte dentro la CV annidata (stesso protocollo di scenario_preds/heads.py)."""
+    """Linear heads refit inside the nested CV (same protocol as scenario_preds/heads.py)."""
 
     Cs: List[float] = field(default_factory=lambda: [0.001, 0.01, 0.1, 1.0, 10.0, 100.0])
-    inner_cv: int = 3  # CV per sessione che sceglie C e la temperatura
+    inner_cv: int = 3  # CV by session that picks C and the temperature
     max_iter: int = 3000
-    class_weight: str = "balanced"  # balanced | none (come la testa di official_v2)
+    class_weight: str = "balanced"  # balanced | none (as in the official_v2 head)
 
 
 @dataclass
 class GateV2Cfg:
-    """Gate v2 (N37, stadio 56): CV annidata per sessione su tutte le take, regole a costo e a rischio.
+    """Gate v2 (N37, stage 56): nested CV by session on all takes, with cost and risk rules.
 
-    Livelli per ogni fold esterna k: (1) CV interna per sessione delle teste di CamFormer sul train esterno
-    -> predizioni fuori campione su cui si addestra il gate; (2) cross-fitting per sessione del gate sul train
-    esterno -> score fuori campione per calibratore e soglie; (3) teste, gate, calibratore e soglie congelati
-    e applicati alla fold k."""
+    Levels for each outer fold k: (1) inner CV by session of the CamFormer heads on the outer train, which gives
+    the out-of-sample predictions the gate is trained on; (2) cross-fitting by session of the gate on the outer
+    train, which gives out-of-sample scores for the calibrator and the thresholds; (3) heads, gate, calibrator
+    and thresholds are frozen and applied to fold k."""
 
     outer_folds: int = 5
-    inner_folds: int = 5  # livello 1
-    gate_folds: int = 5  # livello 2
-    repeats: List[int] = field(default_factory=lambda: [0, 1, 2])  # seed delle partizioni esterne
-    outer_l0: str = "refit"  # refit (testa su tutto il train esterno) | inner_mean (media dei modelli interni)
+    inner_folds: int = 5  # level 1
+    gate_folds: int = 5  # level 2
+    repeats: List[int] = field(default_factory=lambda: [0, 1, 2])  # seed of the outer folds
+    outer_l0: str = "refit"  # refit (head on the whole outer train) | inner_mean (mean of the inner models)
     heads: GateV2HeadsCfg = field(default_factory=GateV2HeadsCfg)
     scorers: List[str] = field(
         default_factory=lambda: ["thr_maxprob", "logreg_A", "logreg_AC", "logreg_ABC", "lgbm_ABC", "class_rule"]
@@ -279,20 +283,20 @@ class GateV2Cfg:
     logreg_inner_cv: int = 3
     lgbm: Dict[str, Any] = field(default_factory=dict)
     reliability_alpha: float = 1.0
-    reliability_folds: int = 5  # N38: affidabilità delle righe di fit fuori fold (fold per sessione)
+    reliability_folds: int = 5  # N38: reliability of the fit rows computed out of fold (folds by session)
     calibration: str = "platt"  # platt | isotonic
-    # N38: righe del train esterno su cui si stimano calibratore e soglie (risk, acc_target, budget). all = come la
-    # run del 18/11; pretrain_unseen = solo le take non viste dal pre-addestramento di CamFormer (in uso reale ogni
-    # take è nuova per CamFormer). Lo scorer si addestra sempre su tutte le righe. Con meno di
-    # calibration_min_errors errori fra quelle righe si torna a all, con avviso e colonna cal_population.
+    # N38: rows of the outer train used to fit the calibrator and the thresholds (risk, acc_target, budget).
+    # all = as in the run of 18/11; pretrain_unseen = only the takes CamFormer did not see in pre-training (in real
+    # use every take is new to CamFormer). The scorer is always trained on all rows. If those rows contain fewer
+    # than calibration_min_errors errors we fall back to all, with a warning and the cal_population column.
     calibration_population: str = "all"
     calibration_min_errors: int = 10
-    calibration_boot: int = 200  # repliche bootstrap per sessione del calibratore (r_up)
-    delta: float = 0.1  # r_up = quantile 1 − δ; livello della garanzia della regola a rischio
+    calibration_boot: int = 200  # session bootstrap replicates of the calibrator (r_up)
+    delta: float = 0.1  # r_up = 1 − δ quantile; level of the guarantee of the risk rule
     betas: List[float] = field(default_factory=lambda: [0.01, 0.02, 0.05, 0.10, 0.20])
     alphas: List[float] = field(default_factory=lambda: [0.02, 0.05, 0.10])
-    risk_grid: int = 20  # coperture candidate 1/G, 2/G, ..., 1 (Bonferroni su G)
-    max_error_rates: List[float] = field(default_factory=lambda: [0.01])  # regola acc_target (come within_pts)
+    risk_grid: int = 20  # candidate coverages 1/G, 2/G, ..., 1 (Bonferroni over G)
+    max_error_rates: List[float] = field(default_factory=lambda: [0.01])  # acc_target rule (like within_pts)
     budgets: List[float] = field(default_factory=lambda: [0.1, 0.2, 0.3])
     primary_rule: str = "cost"
     primary_param: float = 0.05
@@ -309,27 +313,27 @@ class GateV2Cfg:
     bootstrap: int = 1000
     bootstrap_seed: int = 0
     gmacs_per_window: Dict[str, float] = field(default_factory=lambda: {"L0": 0.121627, "L1": 92.430496})
-    extra_gmacs_L0: List[float] = field(default_factory=lambda: [0.0])  # sensibilità: traiettoria per finestra
-    extra_gmacs_L1: List[float] = field(default_factory=lambda: [0.0])  # sensibilità: decodifica per finestra
+    extra_gmacs_L0: List[float] = field(default_factory=lambda: [0.0])  # sensitivity: trajectory cost per window
+    extra_gmacs_L1: List[float] = field(default_factory=lambda: [0.0])  # sensitivity: decoding cost per window
 
 
 @dataclass
 class CostE2ECfg:
-    """Costo end-to-end (stadio 41, M10): tempo per fase di L0 e L1, a batch 1."""
+    """End-to-end cost (stage 41, M10): time of each phase of L0 and L1, at batch size 1."""
 
-    n_clips: int = 200  # campione stratificato per classe
-    n_warmup: int = 5  # clip di riscaldamento scartate
-    passes: int = 2  # si riporta la seconda passata (file in cache), la prima si dichiara
+    n_clips: int = 200  # sample stratified by class
+    n_warmup: int = 5  # warm-up clips, discarded
+    passes: int = 2  # we report the second pass (files cached) and state the first
     seed: int = 0
 
 
 @dataclass
 class SiteDiagCfg:
-    """Diagnostiche di sito (stadio 27, M02): sonda lineare sulle CLS di L1, solo train e val."""
+    """Site diagnostics (stage 27, M02): linear probe on the L1 CLS tokens, train and val only."""
 
-    C: float = 0.1  # regolarizzazione della logistica (come check_site.py della v1)
+    C: float = 0.1  # regularisation of the logistic regression (as in check_site.py of v1)
     max_iter: int = 500
-    cv_folds: int = 5  # GroupKFold per take e per sessione (leggibilità del sito, CV della classe)
+    cv_folds: int = 5  # GroupKFold by take and by session (how readable the site is, CV of the class)
 
 
 @dataclass
@@ -371,9 +375,9 @@ class Config:
         return asdict(self)
 
 
-# --------------------------------------------------------------------------- merge
+# Merging and validation
 def deep_merge(base: Dict[str, Any], over: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge ricorsivo: i dict si fondono, il resto si sovrascrive."""
+    """Recursive merge: dicts are merged, everything else is overwritten."""
     out = copy.deepcopy(base)
     for k, v in (over or {}).items():
         if isinstance(v, dict) and isinstance(out.get(k), dict):
@@ -399,10 +403,10 @@ def _parse_set(item: str) -> Dict[str, Any]:
 
 
 def _coerce(value: Any, typ: Any, where: str) -> Any:
-    """Converte ``value`` al tipo dichiarato o solleva ``TypeError`` con il percorso.
+    """Convert ``value`` to the declared type, or raise ``TypeError`` with the key path.
 
-    Serve soprattutto per i float scritti come ``1e-4``: PyYAML (YAML 1.1) li legge come
-    stringhe, sia nei file sia in ``--set``.
+    We need it mostly for floats written as ``1e-4``: PyYAML (YAML 1.1) reads them as strings, both in
+    the files and in ``--set``.
     """
     if typ is Any:
         return value
@@ -483,7 +487,7 @@ def _one_of(errors: List[str], where: str, value: Any, allowed: Sequence[Any]) -
 
 
 def validate_config(cfg: Config) -> None:
-    """Controlli di dominio: raccoglie tutti gli errori e li riporta insieme (fail fast)."""
+    """Domain checks. We collect all the errors and report them together, then stop."""
     e: List[str] = []
     d, a, fr, fo, cam, ev, g = cfg.data, cfg.alignment, cfg.frames, cfg.folds, cfg.camformer, cfg.egovlp, cfg.gate
     _one_of(e, "data.duration_source", d.duration_source, ["takes_json", "video", "trajectory"])
@@ -534,7 +538,7 @@ def validate_config(cfg: Config) -> None:
     if not 0 <= fb.frame_index < fr.n_frames or fb.size < 16 or not 1 <= fb.r_step <= 100:
         e.append("frame_baseline: frame_index in [0, n_frames), size >= 16, r_step in [1, 100]")
     _one_of(e, "fusion.mode", cfg.fusion.mode, ["fuse", "replace"])
-    _one_of(e, "heads.source", cfg.heads.source, ["probe"])  # il fine-tuning di L1 non si porta (M12)
+    _one_of(e, "heads.source", cfg.heads.source, ["probe"])  # we do not carry over the fine-tuning of L1 (M12)
     if not 0 < cfg.fusion.w_grid_step <= 1:
         e.append("fusion.w_grid_step in (0, 1]")
     _one_of(e, "cost.counter", cfg.cost.counter, ["fvcore", "torch", "analytic"])
@@ -583,7 +587,7 @@ def load_config(
     synthetic: bool = False,
     configs_dir: Path = CONFIGS_DIR,
 ) -> Config:
-    """Carica e valida la configurazione completa."""
+    """Load and validate the full configuration."""
     merged: Dict[str, Any] = {}
     files: List[Path] = [configs_dir / f for f in BASE_FILES]
     if synthetic:

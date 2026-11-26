@@ -1,18 +1,18 @@
-"""Traiettorie della camera per CamFormer (stadio ``traj``) e diagnostica del sistema di riferimento.
+"""Camera trajectories for CamFormer (stage ``traj``), and a diagnostic for the reference frame.
 
-Due sorgenti, entrambe portate a una griglia uniforme a ``poses.fps`` (20 Hz) nel tempo del video:
+There are two sources. Both are resampled on a uniform grid at ``poses.fps`` (20 Hz) in video time.
 
-- ``aria_csv``: ``closed_loop_trajectory.csv`` (MPS, 1 kHz, posa device -> mondo, mondo con gravità
-  lungo -z). È la sorgente del pretraining di CamFormer (``data_prep/step1_extract_segments.py``):
-  tempo = secondi dal primo campione, sotto-campionamento al campione più vicino. Stessa convenzione
-  di tempo usata dagli autori per allineare le narrazioni, quindi la stessa per le nostre finestre.
-- ``pose_json``: ``camera_extrinsics`` per frame (mondo -> camera RGB, ~30 Hz) dei JSON
-  ``annotations/ego_pose/*/camera_pose``. Logica di ``traj_convert.py`` di cascade v2: inversione,
-  interpolazione lineare + slerp, buchi lunghi non validi. Qui la posa è della camera RGB, non del
-  device: ``json_cam_to_device`` e ``json_world_rotation`` la riportano nella convenzione del
-  pretraining (stimarle con ``check-frame``).
+- ``aria_csv``: ``closed_loop_trajectory.csv`` (MPS, 1 kHz, device -> world pose, world with gravity
+  along -z). This is the source CamFormer was pre-trained on (``data_prep/step1_extract_segments.py``):
+  time = seconds from the first sample, downsampled to the nearest sample. The authors used the same time
+  convention to align the narrations, so we use it for our windows too.
+- ``pose_json``: the per-frame ``camera_extrinsics`` (world -> RGB camera, ~30 Hz) in the JSON files
+  ``annotations/ego_pose/*/camera_pose``. Same logic as ``traj_convert.py`` in cascade v2: inversion,
+  linear interpolation + slerp, long gaps marked invalid. Here the pose is the RGB camera's, not the
+  device's, so ``json_cam_to_device`` and ``json_world_rotation`` bring it back to the pre-training
+  convention (estimate them with ``check-frame``).
 
-Formato delle pose: ``[N, 7] = tx, ty, tz, qx, qy, qz, qw`` (device -> mondo), come CamFormer.
+Pose format: ``[N, 7] = tx, ty, tz, qx, qy, qz, qw`` (device -> world), as in CamFormer.
 """
 
 from __future__ import annotations
@@ -49,12 +49,12 @@ class PoseError(Exception):
 
 @dataclass
 class Trajectory:
-    t: np.ndarray  # [N] secondi, griglia uniforme
+    t: np.ndarray  # [N] seconds, uniform grid
     poses: np.ndarray  # [N, 7]
     valid: np.ndarray  # [N] bool
     source: str
-    n_missing_src: int = 0  # campioni della sorgente mancanti tra il primo e l'ultimo (buchi interni)
-    first_src_frame: int = 0  # pose_json: indice del primo frame con posa (> 0 = inizio mancante)
+    n_missing_src: int = 0  # source samples missing between the first and the last one (inner gaps)
+    first_src_frame: int = 0  # pose_json: index of the first frame with a pose (> 0 = missing start)
 
     def save(self, dest: Path) -> None:
         from src.cascade.utils.feature_io import save_npz
@@ -69,7 +69,7 @@ class Trajectory:
             return cls(z["t"], z["poses"], z["valid"].astype(bool), str(z["source"]), **extra)
 
 
-# ----------------------------------------------------------------------------- geometria
+# Geometry
 def slerp(q0: np.ndarray, q1: np.ndarray, a: np.ndarray) -> np.ndarray:
     d = np.sum(q0 * q1, axis=1)
     q1 = np.where((d < 0)[:, None], -q1, q1)
@@ -84,7 +84,7 @@ def slerp(q0: np.ndarray, q1: np.ndarray, a: np.ndarray) -> np.ndarray:
 
 
 def align_quat_signs(q: np.ndarray) -> np.ndarray:
-    """Segno continuo dei quaternioni (q e -q sono la stessa rotazione)."""
+    """Keep the sign of the quaternions continuous (q and -q are the same rotation)."""
     if len(q) < 2:
         return q
     flips = np.concatenate([[0], (np.sum(q[1:] * q[:-1], axis=1) < 0).astype(np.int64)])
@@ -92,7 +92,7 @@ def align_quat_signs(q: np.ndarray) -> np.ndarray:
 
 
 def extrinsics_to_c2w(E: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Estrinseche mondo -> camera ``[N, 3, 4]`` -> (centro ``[N, 3]``, quaternione camera -> mondo ``[N, 4]``)."""
+    """World -> camera extrinsics ``[N, 3, 4]`` -> (centre ``[N, 3]``, camera -> world quaternion ``[N, 4]``)."""
     R, t = E[:, :, :3], E[:, :, 3]
     Rwc = np.transpose(R, (0, 2, 1))
     centre = -np.einsum("nij,nj->ni", Rwc, t)
@@ -100,7 +100,7 @@ def extrinsics_to_c2w(E: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def apply_frame_correction(poses: np.ndarray, cam_to_device: np.ndarray, world_rot: np.ndarray) -> np.ndarray:
-    """R_w'd = W @ R_wc @ X, centro' = W @ centro (il braccio di leva camera-device si trascura)."""
+    """R_w'd = W @ R_wc @ X, centre' = W @ centre (we ignore the camera-device lever arm)."""
     X, W = np.asarray(cam_to_device, float), np.asarray(world_rot, float)
     if np.allclose(X, np.eye(3)) and np.allclose(W, np.eye(3)):
         return poses
@@ -115,7 +115,7 @@ def apply_frame_correction(poses: np.ndarray, cam_to_device: np.ndarray, world_r
     return out
 
 
-# ----------------------------------------------------------------------------- sorgenti
+# Sources
 def from_aria_csv(path: Path, fps: float) -> Trajectory:
     import pandas as pd
 
@@ -188,7 +188,7 @@ def from_pose_json(path: Path, video_path: Optional[str], pcfg: dict) -> Traject
 
 
 def load_take(row, pcfg: dict) -> Trajectory:
-    """Traiettoria di una take secondo ``poses.source`` (e ``fallback_to_json``)."""
+    """Trajectory of one take, following ``poses.source`` (and ``fallback_to_json``)."""
     if pcfg["source"] == "aria_csv":
         try:
             return from_aria_csv(Path(row.aria_csv_path), pcfg["fps"])
@@ -200,9 +200,9 @@ def load_take(row, pcfg: dict) -> Trajectory:
     return from_pose_json(Path(row.pose_json_path), row.video_path, pcfg)
 
 
-# ----------------------------------------------------------------------------- diagnostica
+# Diagnostics
 def _kabsch(a: np.ndarray, b: np.ndarray, w: Optional[np.ndarray] = None) -> np.ndarray:
-    """Rotazione R che minimizza sum w ||a_i - R b_i||^2."""
+    """Rotation R that minimises sum w ||a_i - R b_i||^2."""
     w = np.ones(len(a)) if w is None else w
     H = (b * w[:, None]).T @ a
     U, _, Vt = np.linalg.svd(H)
@@ -211,11 +211,11 @@ def _kabsch(a: np.ndarray, b: np.ndarray, w: Optional[np.ndarray] = None) -> np.
 
 
 def estimate_frame(json_traj: Trajectory, csv_traj: Trajectory, lag_s: float = 0.5, max_shift_s: float = 3.0) -> dict:
-    """Stima ``json_cam_to_device`` (X) e ``json_world_rotation`` (W) da una take con entrambe le sorgenti.
+    """Estimate ``json_cam_to_device`` (X) and ``json_world_rotation`` (W) from a take that has both sources.
 
-    Modello: R_wd(t) = W @ R_wc(t + s) @ X. Lo sfasamento s si trova correlando le velocità angolari;
-    X dalle rotazioni relative su ``lag_s`` (problema hand-eye: rotvec(A) = X rotvec(B), Kabsch);
-    W come media (proiettata su SO(3)) di R_wd X^T R_wc^T. Il residuo in gradi dice se il modello regge.
+    Model: R_wd(t) = W @ R_wc(t + s) @ X. We find the time shift s by correlating the angular velocities,
+    X from the relative rotations over ``lag_s`` (a hand-eye problem: rotvec(A) = X rotvec(B), solved with Kabsch),
+    and W as the mean of R_wd X^T R_wc^T, projected on SO(3). The residual in degrees tells whether the model holds.
     """
     fps = 1.0 / float(np.median(np.diff(json_traj.t)))
     Rc = Rotation.from_quat(json_traj.poses[:, 3:])
@@ -271,41 +271,41 @@ def average_rotations(mats) -> np.ndarray:
     return U @ np.diag([1, 1, np.sign(np.linalg.det(U @ Vt))]) @ Vt
 
 
-# ----------------------------------------------------------------------------- verso dell'alto nei JSON
-OPENCV_TO_ARIA = np.diag([-1.0, -1.0, 1.0])  # trasformazione del paper (supp. 2.3): OpenCV (x dx, y giù) -> Aria (x sx, y su)
+# Which way is up in the JSON poses
+OPENCV_TO_ARIA = np.diag([-1.0, -1.0, 1.0])  # paper (supp. 2.3): OpenCV (x right, y down) -> Aria (x left, y up)
 
 
 def roll_candidates() -> Dict[int, np.ndarray]:
-    """X candidate (camera -> device): conversione del paper composta con un rollio di 0/90/180/270°
-    attorno all'asse ottico (la camera RGB di Aria è montata ruotata rispetto al device)."""
+    """Candidate X (camera -> device): the paper's conversion composed with a roll of 0/90/180/270°
+    around the optical axis (the Aria RGB camera is mounted rotated with respect to the device)."""
     return {k: Rotation.from_euler("z", 90 * k, degrees=True).as_matrix() @ OPENCV_TO_ARIA for k in range(4)}
 
 
 def up_statistics(traj: Trajectory) -> dict:
-    """Su una traiettoria SENZA correzione (frame della camera dei JSON): direzione media dell'alto del
-    mondo (+z) espressa nel frame della camera, e inclinazione media dell'asse ottico (gradi, < 0 = verso il basso).
+    """On a trajectory WITHOUT correction (camera frame of the JSON files): mean direction of world up (+z)
+    in the camera frame, and mean tilt of the optical axis (degrees, < 0 = pointing down).
 
-    Chi indossa gli occhiali sta per lo più dritto, quindi la media indica quale asse della camera punta in alto.
+    People wearing the glasses mostly stand upright, so the mean tells which camera axis points up.
     """
-    R = Rotation.from_quat(traj.poses[traj.valid, 3:]).as_matrix()  # camera -> mondo
+    R = Rotation.from_quat(traj.poses[traj.valid, 3:]).as_matrix()  # camera -> world
     if len(R) < 10:
         raise ValueError("troppi pochi campioni validi")
-    up_c = R[:, 2, :]  # riga z di R_wc = e_z del mondo nel frame della camera (R_wc^T e_z)
+    up_c = R[:, 2, :]  # z row of R_wc = world e_z in the camera frame (R_wc^T e_z)
     mean = up_c.mean(0)
-    pitch = np.degrees(np.arcsin(np.clip(R[:, 2, 2], -1, 1)))  # componente z (mondo) dell'asse ottico
+    pitch = np.degrees(np.arcsin(np.clip(R[:, 2, 2], -1, 1)))  # z component (world) of the optical axis
     return {
         "up_x": float(mean[0]), "up_y": float(mean[1]), "up_z": float(mean[2]),
-        "up_consistency": float(np.linalg.norm(mean)),  # 1 = sempre la stessa direzione
+        "up_consistency": float(np.linalg.norm(mean)),  # 1 = always the same direction
         "pitch_deg_mean": float(pitch.mean()),
         "pitch_deg_median": float(np.median(pitch)),
     }
 
 
 def suggest_cam_to_device(up_mean: np.ndarray) -> dict:
-    """Sceglie il rollio il cui asse y del device (in alto) è più allineato con l'alto medio osservato.
+    """Pick the roll whose device y axis (up) is best aligned with the observed mean up direction.
 
-    Restituisce la X suggerita, l'allineamento (coseno) e il rollio residuo in gradi rispetto al candidato
-    scelto (il piano dell'immagine; un residuo grande vuol dire montaggio non a multipli di 90°)."""
+    Returns the suggested X, the alignment (cosine) and the residual roll in degrees with respect to the chosen
+    candidate (in the image plane; a large residual means the camera is not mounted at a multiple of 90°)."""
     u = np.asarray(up_mean, float)
     u_img = u.copy()
     u_img[2] = 0.0

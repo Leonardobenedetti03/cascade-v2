@@ -39,7 +39,7 @@ def test_cascade_gmacs_negative_cost():
 
 
 def test_max_escalations_basic():
-    # base 1, stadio 2 costa 10: budget 4 -> 3 GMACs extra medi -> 30% di 10 campioni.
+    # base 1, stage 2 costs 10: budget 4 -> 3 extra GMACs on average -> 30% of 10 samples.
     assert max_escalations(10, 4.0, 1.0, 10.0) == 3
     assert max_escalations(10, 4.9, 1.0, 10.0) == 3
     assert max_escalations(10, 1.0, 1.0, 10.0) == 0
@@ -47,7 +47,7 @@ def test_max_escalations_basic():
 
 
 def test_max_escalations_float_boundary():
-    # 10 * (1.3 - 1.0) / 1.0 = 2.9999999999999996 in float: deve dare 3.
+    # 10 * (1.3 - 1.0) / 1.0 = 2.9999999999999996 in floating point: it must give 3.
     assert max_escalations(10, 1.3, 1.0, 1.0) == 3
 
 
@@ -84,7 +84,7 @@ def test_relative_cost():
 
 
 def test_expected_camformer_matches_base_arch():
-    """I6: cost.expected.camformer di base.yaml coerente con l'architettura e il contesto reali."""
+    """I6: cost.expected.camformer in base.yaml matches the real architecture and context."""
     from src.cascade.evaluation.cost import camformer_macs
     from src.cascade.utils.config import load_config
 

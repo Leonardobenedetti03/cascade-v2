@@ -1,4 +1,4 @@
-"""M07: un cambio di fold o di split dopo lo stadio 20 deve invalidare gli stadi che ne dipendono."""
+"""M07: a change of folds or split after stage 20 must invalidate the stages that depend on it."""
 
 import pytest
 
@@ -35,9 +35,9 @@ def test_changed_folds_invalidate_stage_20(tmp_path):
     out = _stage_20_done(tmp_path, load_config())
     assert is_done(tmp_path, "20_camformer", load_config().to_dict(), [out], part="fold0")
     by_site = load_config(overrides=BY_SITE).to_dict()
-    with pytest.raises(ConfigMismatch):  # lo stadio 20 non si salta in silenzio
+    with pytest.raises(ConfigMismatch):  # stage 20 is not skipped silently
         is_done(tmp_path, "20_camformer", by_site, [out], part="fold0")
-    with pytest.raises(ConfigMismatch):  # e uno stadio a valle (es. 45) non lo accetta come a monte
+    with pytest.raises(ConfigMismatch):  # and a downstream stage (e.g. 45) does not accept it as upstream
         require_stage(tmp_path, "20_camformer", by_site, parts=["fold0"])
 
 
@@ -57,7 +57,7 @@ def test_stage_25_does_not_depend_on_folds(tmp_path):
 
 @pytest.mark.parametrize("stage", CLIP_DEPENDENT_STAGES)
 def test_dependent_stages_track_clip_definition(stage):
-    """I2: le chiavi dello stadio 00 (finestre, durata, sorgente delle traiettorie, hash) arrivano a valle."""
+    """I2: the keys of stage 00 (windows, duration, trajectory source, hash) reach the downstream stages."""
     assert set(CLIP_KEYS) <= set(STAGE_KEYS[stage])
     assert "paths.split_sha256" in CLIP_KEYS and "data.traj_source" in CLIP_KEYS
 

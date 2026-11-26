@@ -1,4 +1,4 @@
-"""Finestre temporali di una take (tempo del video, secondi)."""
+"""Time windows of a take (video time, in seconds)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ import numpy as np
 
 
 def compute_windows(duration_s: float, length_s: float, n_windows: int = 1, placement: str = "center") -> List[Tuple[float, float]]:
-    """Fino a ``n_windows`` finestre ``(t_start, t_end)`` di durata ``length_s`` dentro ``[0, duration_s]``.
+    """Up to ``n_windows`` windows ``(t_start, t_end)`` of length ``length_s`` inside ``[0, duration_s]``.
 
-    ``center``: centri spaziati di ``length_s`` attorno al centro della take; ``uniform``: centri nei
-    punti medi di K parti uguali. Una take più corta della finestra dà una sola finestra = take intera.
-    Le finestre si spostano per restare dentro la take; i duplicati si tolgono.
+    ``center``: centres ``length_s`` apart around the centre of the take. ``uniform``: centres at the midpoints
+    of K equal parts. A take shorter than the window gives one window, the whole take.
+    Windows are shifted to stay inside the take, and duplicates are removed.
     """
     if not np.isfinite(duration_s) or duration_s <= 0:
         return []

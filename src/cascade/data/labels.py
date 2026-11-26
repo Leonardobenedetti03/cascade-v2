@@ -1,9 +1,8 @@
-"""Ordine delle classi: unica fonte ``configs/labels.yaml``.
+"""Class order. The only source is ``configs/labels.yaml``.
 
-Ogni file che contiene logit/probabilità porta con sé i nomi delle classi
-(metadati del parquet); al caricamento :func:`assert_class_order` verifica che
-coincidano con ``labels.yaml``. La mappatura dal CSV è sempre per nome del task,
-mai per la colonna ``label`` del CSV (che usa un ordine diverso).
+Every file with logits or probabilities stores the class names (in the parquet metadata), and
+:func:`assert_class_order` checks them against ``labels.yaml`` when the file is loaded. We always map
+the CSV by task name, never by its ``label`` column, which uses a different order.
 """
 
 from __future__ import annotations
@@ -62,7 +61,7 @@ def load_labels(path: Path = LABELS_FILE) -> Labels:
 
 
 def assert_class_order(found: Sequence[str], labels: Labels, *, where: str = "") -> None:
-    """Errore se l'ordine delle classi salvato non coincide con labels.yaml."""
+    """Raise an error if the saved class order is not the one in labels.yaml."""
     found = tuple(found)
     if found != labels.names:
         raise ValueError(

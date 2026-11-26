@@ -1,12 +1,12 @@
-"""Valutazione del gate v2 sulle decisioni fuori campione della CV annidata.
+"""Evaluation of the gate v2 on the out-of-sample decisions of the nested CV.
 
-Ogni take è valutata una volta per repeat, da modelli che non hanno visto la sua sessione. Le quantità per take
-si mediano sui repeat (quota dei repeat che scalano, correttezza media); gli intervalli ricampionano le SESSIONI
-(take della stessa sessione non sono indipendenti) e i confronti tra scorer sono appaiati (stessi ricampionamenti),
-con correzione di Holm sulle coppie pre-registrate.
+Each take is evaluated once per repeat, by models that have not seen its session. We average the per-take
+quantities over the repeats (share of repeats that escalate, mean correctness). The intervals resample SESSIONS
+(takes of the same session are not independent), and the comparisons between scorers are paired (same
+resamples), with a Holm correction over the pre-registered pairs.
 
-Sistemi valutati: riferimenti ``always_L0`` (solo le take senza CamFormer vanno a EgoVLP), ``always_L1``,
-``oracle`` (scala esattamente dove EgoVLP corregge CamFormer) e ogni combinazione scorer × regola × parametro.
+Systems evaluated: the references ``always_L0`` (only the takes without CamFormer go to EgoVLP), ``always_L1``
+and ``oracle`` (escalate exactly where EgoVLP fixes CamFormer), and every scorer × rule × parameter.
 """
 
 from __future__ import annotations
@@ -27,9 +27,9 @@ log = logging.getLogger(__name__)
 RULES_ORDER = ("cost", "cost_hat", "risk", "acc_target", "budget")
 
 
-# --------------------------------------------------------------------------- matrici [R, N]
+# Matrices [R, N]
 class Outcomes:
-    """Uscite fuori campione per repeat e take, nell'ordine di ``data.takes``."""
+    """Out-of-sample outputs per repeat and take, in the order of ``data.takes``."""
 
     def __init__(self, data: ScenarioData, takes: pd.DataFrame, scorers: List[str]) -> None:
         self.data = data
@@ -85,7 +85,7 @@ def systems(out: Outcomes, thresholds: pd.DataFrame, gcfg) -> Dict[Tuple[str, st
     sys: Dict[Tuple[str, str, float], np.ndarray] = {}
     for ref in ("always_L0", "always_L1", "oracle"):
         sys[(ref, "fixed", 0.0)] = out.reference(ref)
-    if "class_rule" in out.s:  # decisione naturale della regola per classe: scala le procedurali predette
+    if "class_rule" in out.s:  # natural decision of the per-class rule: escalate the predicted procedural takes
         sys[("class_rule", "natural", 0.0)] = (np.nan_to_num(out.s["class_rule"]) > 0.5) | ~out.has_l0
     keys = thresholds[["scorer", "rule", "param"]].drop_duplicates()
     keys = keys.assign(o=keys.rule.map({r: i for i, r in enumerate(RULES_ORDER)})).sort_values(["scorer", "o", "param"])
@@ -94,7 +94,7 @@ def systems(out: Outcomes, thresholds: pd.DataFrame, gcfg) -> Dict[Tuple[str, st
     return sys
 
 
-# --------------------------------------------------------------------------- metriche puntuali e bootstrap
+# Point metrics and bootstrap
 def _per_take(out: Outcomes, esc: np.ndarray) -> Dict[str, np.ndarray]:
     corr = np.where(esc, out.c1, out.c0)
     return {
@@ -176,7 +176,7 @@ def metric_rows(out: Outcomes, sys, masks, gcfg) -> Tuple[List[dict], Dict[str, 
     return rows, W
 
 
-# --------------------------------------------------------------------------- curve, AUROC, confronti
+# Curves, AUROC, comparisons
 def _weighted_auroc(score: np.ndarray, label: np.ndarray, w: np.ndarray) -> float:
     from sklearn.metrics import roc_auc_score
 
@@ -188,7 +188,7 @@ def _weighted_auroc(score: np.ndarray, label: np.ndarray, w: np.ndarray) -> floa
 
 
 def curve_rows(out: Outcomes, masks, gcfg, step: int = 1) -> List[dict]:
-    """Accuratezza contro quota scalata, ordinando le take per rischio calibrato (confrontabile tra fold)."""
+    """Accuracy against escalated share, sorting the takes by calibrated risk (comparable across folds)."""
     rows = []
     grid = np.arange(0, 101, step)
     for sub, m in masks.items():
@@ -264,7 +264,7 @@ def auc_and_comparisons(out: Outcomes, sys, masks, W, gcfg) -> Tuple[List[dict],
 
 
 def _decision(sys, name: str, gcfg):
-    """Decisione di uno scorer al punto primario; la regola per classe usa la sua decisione naturale."""
+    """Decision of one scorer at the primary point; the per-class rule uses its natural decision."""
     if name == "class_rule":
         return sys.get(("class_rule", "natural", 0.0))
     return sys.get((name, gcfg.primary_rule, float(gcfg.primary_param)))
@@ -285,7 +285,7 @@ def _comp(sub, a, b, metric, diff, d) -> dict:
 
 
 def holm(rows: List[dict]) -> List[dict]:
-    """p di Holm per (sottoinsieme, metrica) sulle coppie pre-registrate."""
+    """Holm p-values per (subset, metric) over the pre-registered pairs."""
     df = pd.DataFrame(rows)
     if df.empty:
         return rows
@@ -299,7 +299,7 @@ def holm(rows: List[dict]) -> List[dict]:
     return df.to_dict("records")
 
 
-# --------------------------------------------------------------------------- calibrazione, procedurali, costi
+# Calibration, procedural takes, costs
 def calibration_rows(out: Outcomes, masks, gcfg, n_bins: int = 10) -> List[dict]:
     rows = []
     for sub, m in masks.items():
@@ -338,8 +338,8 @@ def calibration_rows(out: Outcomes, masks, gcfg, n_bins: int = 10) -> List[dict]
 
 
 def procedural_rows(out: Outcomes, sys, masks, gcfg) -> List[dict]:
-    """Take che CamFormer predice procedurali: quante restano su CamFormer e quante di queste sono corrette
-    (chiamate a EgoVLP risparmiate rispetto alla regola per classe, che le scala tutte)."""
+    """Takes that CamFormer predicts as procedural: how many stay on CamFormer, and how many of those are right
+    (EgoVLP calls saved compared with the per-class rule, which escalates all of them)."""
     rows = []
     proc = out.data.procedural
     pred_proc = out.has_l0 & (out.pred0 >= 0) & proc[np.clip(out.pred0, 0, None)]
@@ -387,15 +387,15 @@ def cost_sensitivity_rows(metrics: pd.DataFrame, gcfg) -> List[dict]:
 
 
 def cost_vs_egovlp_rows(metrics: pd.DataFrame, gcfg, n_windows: int) -> List[dict]:
-    """Costo della cascata contro "solo EgoVLP su tutte le take" (senza CamFormer davanti), per ogni β della
-    regola a costo e per i riferimenti. GMACs per take = finestre × (C_L0 + ρ · C_L1) per la cascata e
-    finestre × C_L1 per solo EgoVLP; l'intervallo viene da quello di ρ (bootstrap per sessione)."""
+    """Cost of the cascade against "EgoVLP alone on every take" (no CamFormer in front), for each β of the cost
+    rule and for the references. GMACs per take = windows × (C_L0 + ρ · C_L1) for the cascade and windows × C_L1
+    for EgoVLP alone. The interval comes from the one on ρ (bootstrap by session)."""
     gm = gcfg.gmacs_per_window
     l0, l1 = n_windows * gm["L0"], n_windows * gm["L1"]
     sel = metrics[metrics.rule.isin(["cost", "cost_hat", "fixed"]) | (metrics.system == "class_rule")]
     rows = []
     for r in sel.itertuples(index=False):
-        if r.system == "always_L1":  # "solo EgoVLP": nessun CamFormer davanti
+        if r.system == "always_L1":  # "EgoVLP alone": no CamFormer in front
             casc, lo, hi = l1, l1, l1
         else:
             casc, lo, hi = l0 + r.rho * l1, l0 + r.rho_ci_low * l1, l0 + r.rho_ci_high * l1
@@ -427,7 +427,7 @@ def cost_vs_egovlp_rows(metrics: pd.DataFrame, gcfg, n_windows: int) -> List[dic
 
 
 def model_rows(out: Outcomes, masks) -> List[dict]:
-    """Accuratezza di CamFormer ed EgoVLP fuori campione per sottoinsieme (media sui repeat)."""
+    """Out-of-sample accuracy of CamFormer and EgoVLP per subset (mean over the repeats)."""
     rows = []
     for sub, m in masks.items():
         if not m.any():

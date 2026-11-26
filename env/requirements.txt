@@ -1,6 +1,6 @@
-# Dipendenze della pipeline (Python >= 3.9, compatibile con l'ambiente CamFormer).
-# torch/torchvision NON sono fissati: installare la build che corrisponde alla CUDA
-# del cluster (vedi docs/RUNBOOK_HPC.md), es.
+# Pipeline dependencies (Python >= 3.9, compatible with the CamFormer environment).
+# torch/torchvision are NOT pinned: install the build that matches the CUDA version
+# of your machine (see docs/RUNBOOK_HPC.md), e.g.
 #   pip install torch --index-url https://download.pytorch.org/whl/cu121
 torch
 numpy>=1.24
@@ -10,14 +10,14 @@ pyarrow>=14
 scikit-learn>=1.3
 lightgbm>=4.0
 pyyaml>=6.0
-einops>=0.7            # TimeSformer di EgoVLP
-av>=11.0               # decodifica video (fallback)
-decord>=0.6; platform_system == "Linux" and python_version < "3.12"   # decodifica veloce, opzionale
-fvcore>=0.1.5          # conteggio MAC (stadio 40)
+einops>=0.7            # EgoVLP's TimeSformer
+av>=11.0               # video decoding (fallback)
+decord>=0.6; platform_system == "Linux" and python_version < "3.12"   # faster decoding, optional
+fvcore>=0.1.5          # MAC counting (stage 40)
 matplotlib>=3.7
-tabulate>=0.9          # tabelle markdown del report
-jinja2>=3.1            # tabelle LaTeX del report (pandas 2; senza, fallback manuale)
+tabulate>=0.9          # markdown tables of the report
+jinja2>=3.1            # LaTeX tables of the report (pandas 2; without it, a manual fallback)
 pytest>=7.4
-torchvision            # baseline un frame (MobileNetV3-Small, B1); stessa build di torch
-# Solo per lo zero-shot reale (encoder di testo DistilBERT di EgoVLP):
+torchvision            # one-frame baseline (MobileNetV3-Small, B1); same build as torch
+# Only for the real zero-shot run (EgoVLP's DistilBERT text encoder):
 transformers>=4.30

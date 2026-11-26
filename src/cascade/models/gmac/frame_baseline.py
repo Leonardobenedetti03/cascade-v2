@@ -1,15 +1,15 @@
-"""L½: classificatore su un solo frame a bassa risoluzione (baseline "un frame", B1).
+"""L½: a classifier on a single low-resolution frame (the "one frame" baseline, B1).
 
-Gli 8 scenari sono 8 luoghi diversi: un solo frame piccolo può bastare. Per misurarlo:
-MobileNetV3-Small di torchvision, backbone congelato, feature dopo l'average pooling
-(576 dimensioni), testa lineare per fold (stesso protocollo delle teste L1, stadio 28).
+The 8 scenarios happen in 8 different kinds of places, so one small frame might be enough. To measure this we
+use torchvision's MobileNetV3-Small, frozen, with the features after average pooling (576 dimensions) and a
+linear head per fold (same protocol as the L1 heads, stage 28).
 
-- Input: il frame ``frame_baseline.frame_index`` dei 16 estratti dallo stadio 10 (già
-  ``CenterCrop`` + ``Resize(224)``), ridimensionato a ``frame_baseline.size`` (112) con
-  antialias, normalizzazione ImageNet (quella dei pesi torchvision).
-- Pesi: da file locale (``paths.frame_baseline_ckpt``, state_dict di torchvision
-  ``mobilenet_v3_small``); nessun download dentro la pipeline (TODO(HPC): scaricarli sul
-  login node, vedi HPC_CHECKLIST). Con ``pretrained: false`` pesi casuali (solo sintetico).
+- Input: frame ``frame_baseline.frame_index`` of the 16 extracted by stage 10 (already ``CenterCrop`` +
+  ``Resize(224)``), resized to ``frame_baseline.size`` (112) with antialias, ImageNet normalisation (the one
+  of the torchvision weights).
+- Weights: from a local file (``paths.frame_baseline_ckpt``, torchvision ``mobilenet_v3_small``
+  state_dict). Nothing is downloaded inside the pipeline: we fetch the file on the login node beforehand.
+  With ``pretrained: false`` the weights are random (synthetic runs only).
 """
 
 from __future__ import annotations
@@ -26,12 +26,12 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
 def build_frame_model(arch: str = "mobilenet_v3_small"):
-    """Backbone con uscita = feature dopo l'average pooling ([B, 576] per MobileNetV3-Small)."""
+    """Backbone whose output is the features after average pooling ([B, 576] for MobileNetV3-Small)."""
     import torch.nn as nn
 
     try:
         from torchvision import models
-    except ImportError as e:  # pragma: no cover - dipende dall'ambiente
+    except ImportError as e:  # pragma: no cover - depends on the environment
         raise ImportError("frame_baseline richiede torchvision (env/requirements.txt)") from e
     if arch != "mobilenet_v3_small":
         raise ValueError(f"frame_baseline.arch non supportata: {arch!r}")
@@ -51,8 +51,8 @@ def build_frame_model(arch: str = "mobilenet_v3_small"):
 
 
 def load_frame_weights(model, ckpt: Path) -> None:
-    """Carica uno state_dict torchvision di mobilenet_v3_small (chiavi ``features.*``);
-    le chiavi del classificatore ImageNet vengono ignorate; chiavi del backbone mancanti → errore."""
+    """Load a torchvision state_dict of mobilenet_v3_small (keys ``features.*``). The keys of the ImageNet
+    classifier are ignored; missing backbone keys are an error."""
     import torch
 
     sd = torch.load(ckpt, map_location="cpu", weights_only=False)
@@ -64,7 +64,7 @@ def load_frame_weights(model, ckpt: Path) -> None:
 
 
 def preprocess_single(frames_uint8: np.ndarray, size: int):
-    """uint8 [B, H, W, 3] → float [B, 3, size, size] normalizzato ImageNet."""
+    """uint8 [B, H, W, 3] → float [B, 3, size, size], ImageNet-normalised."""
     import torch
     import torch.nn.functional as F
 
@@ -77,14 +77,14 @@ def preprocess_single(frames_uint8: np.ndarray, size: int):
 
 
 def pixels_read(size: int, n_frames: int = 1) -> int:
-    """Pixel in ingresso al modello (× 3 canali): la metrica "pixel letti"."""
+    """Pixels fed to the model (× 3 channels): the "pixels read" metric."""
     return int(n_frames * size * size * 3)
 
 
 def frame_features(
     model, frames_dir: Path, clip_ids, frame_index: int, size: int, batch_size: int, device, num_workers: int = 0
 ) -> Optional[np.ndarray]:
-    """Feature [N, D] per le clip (stesso ordine di ``clip_ids``)."""
+    """Features [N, D] for the clips (same order as ``clip_ids``)."""
     import torch
 
     model.eval().to(device)

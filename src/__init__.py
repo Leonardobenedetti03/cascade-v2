@@ -1,8 +1,7 @@
-"""Pacchetto principale della cascata CamFormer -> TimeSformer-EgoVLP.
+"""Root package of the project.
 
-Qui c'è solo la radice dei percorsi: dati e run vivono sotto la directory indicata
-dalla variabile d'ambiente ``DL4CV_ROOT`` (con gli override di ``src/cascade/paths.py``)
-e non sono mai hardcoded nel codice. Le fold sono versionate nel repo, in ``splits/``.
+It only knows where things are. Data and runs live under the folder in the environment variable
+``DL4CV_ROOT`` (with the overrides in ``src/cascade/utils/paths.py``), so no data path is hardcoded.
 """
 
 from __future__ import annotations
@@ -12,17 +11,17 @@ from pathlib import Path
 
 ENV_VAR = "DL4CV_ROOT"
 
-#: Radice del repository (serve solo per file versionati: configs/, splits/).
+#: Repository root, used only for files kept in git (configs/; splits/ was for the first pipeline).
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIGS_DIR = REPO_ROOT / "configs"
 SPLITS_DIR = REPO_ROOT / "splits"
 
 
 def dl4cv_root() -> Path:
-    """Restituisce ``$DL4CV_ROOT`` come ``Path``.
+    """Return ``$DL4CV_ROOT`` as a ``Path``.
 
     Raises:
-        RuntimeError: se la variabile non è impostata o non punta a una directory.
+        RuntimeError: if the variable is not set or does not point to a folder.
     """
     value = os.environ.get(ENV_VAR)
     if not value:

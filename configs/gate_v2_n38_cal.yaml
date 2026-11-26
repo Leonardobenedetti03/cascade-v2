@@ -1,7 +1,8 @@
-# N38, run correttiva 2 di 2: correzione dell'affidabilità + calibratore e soglie stimati solo sulle take del train
-# esterno non viste dal pre-addestramento di CamFormer (in uso reale ogni take è nuova per CamFormer).
-# Tutto il resto come la run del 18/11 (job 772601) e come gate_v2_n38_rel.yaml.
-#   python scripts/56_gate_v2.py --run-name gate_v2 --scenario-run DIR --tag n38_cal --config configs/gate_v2_n38_cal.yaml
+# N38, corrective run 2 of 2. This is the run in the report.
+# The reliability fix, plus calibrator and thresholds fitted only on the outer-train takes that CamFormer did not see
+# in pre-training (in real use every take is new to CamFormer). Everything else as in the run of 18/11 (job 772601)
+# and in gate_v2_n38_rel.yaml.
+#   python scripts/03_nested_cv.py --run-name gate_v2 --scenario-run DIR --tag n38_cal --config configs/gate_v2_n38_cal.yaml
 gate_v2:
   betas: [0.01, 0.02, 0.05, 0.10, 0.20]
   scorers: [thr_maxprob, logreg_A, logreg_AC, logreg_ABC, lgbm_ABC, class_rule]

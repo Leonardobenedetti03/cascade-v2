@@ -1,4 +1,4 @@
-# L1: TimeSformer con pesi EgoVLP (third_party/EgoVLP), backbone congelato.
+# L1: TimeSformer with EgoVLP weights (third_party/EgoVLP), frozen backbone.
 egovlp:
   arch:
     img_size: 224
@@ -8,7 +8,7 @@ egovlp:
     num_heads: 12
     num_frames: 4
     proj_dim: 256
-  # 4 dei 16 frame estratti (simmetrici attorno al centro della finestra).
+  # 4 of the 16 extracted frames (symmetric around the centre of the window).
   frame_indices: [2, 6, 9, 13]
   norm_mean: [0.485, 0.456, 0.406]
   norm_std: [0.229, 0.224, 0.225]
@@ -21,7 +21,7 @@ egovlp:
     enabled: true
     text_model: distilbert-base-uncased
     temperature: 0.05
-    # Prompt in stile narrazione Ego4D, chiavi = name di labels.yaml.
+    # Prompts in the style of Ego4D narrations, keys = name in labels.yaml.
     prompts:
       Basketball: "#C C plays basketball on a court"
       Dance: "#C C dances"
