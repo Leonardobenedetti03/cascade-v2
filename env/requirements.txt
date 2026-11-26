@@ -1,6 +1,6 @@
 # Pipeline dependencies (Python >= 3.9, compatible with the CamFormer environment).
 # torch/torchvision are NOT pinned: install the build that matches the CUDA version
-# of your machine (see docs/RUNBOOK_HPC.md), e.g.
+# of your machine (see docs/hpc_runbook.md), e.g.
 #   pip install torch --index-url https://download.pytorch.org/whl/cu121
 torch
 numpy>=1.24

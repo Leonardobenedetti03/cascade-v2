@@ -17,6 +17,8 @@ The SLURM log of each run sits next to its outputs.
   validation split).
 - `first_evaluation_official_split/`: our first evaluation on the official split, made with the old pipeline. Its code
   is in the tag `archive/development`. Not in the report.
+- `first_evaluation_vs_nested_cv.md`: a summary we wrote on 18/11 comparing the first evaluation with the
+  pre-registered nested CV run (`preregistered_772601`). Not in the report.
 
 ## Files of the report run
 

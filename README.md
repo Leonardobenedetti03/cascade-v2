@@ -26,7 +26,8 @@ src/cascade/utils/       config, command line, paths, logging
 scripts/                 the entry points, numbered in the order they run
 configs/                 YAML configs (gate_v2_n38_cal.yaml is the run in the report)
 results/                 the outputs used in the report, see results/README.md
-hpc/                     SLURM scripts we used on the Bocconi cluster
+hpc/                     SLURM scripts we used on the Bocconi cluster, see docs/hpc_runbook.md
+docs/                    the decision log and the HPC runbook
 tests/                   unit tests, CPU only, synthetic data
 third_party/             CamFormer (seeing_without_pixels) and EgoVLP, as git submodules
 ```
@@ -84,7 +85,8 @@ python scripts/01_extract_features.py heads $SET
 python scripts/01_extract_features.py heads --eval-test $SET    # predictions on the official test split
 ```
 
-On the cluster we ran the same chain with `hpc/features_submit.sh`. Stages that are already done are skipped.
+On the cluster we ran the same chain with `hpc/features_submit.sh` (see `docs/hpc_runbook.md`). Stages that are
+already done are skipped. More details on this step are in [The feature pipeline](#the-feature-pipeline) below.
 
 ### 2. Compute cost
 
@@ -130,6 +132,63 @@ python scripts/04_check_report_numbers.py
 This recomputes 162 numbers of the report from `results/` and prints them next to the values in the paper. All of
 them match. It needs neither data nor a GPU, so you can run it right after cloning.
 
+## The feature pipeline
+
+Step 1 is our version of a package Giorgio wrote for the project (`scenario_preds`). It gives every take of the subset
+one scenario prediction from each frozen model, with a linear head trained on top:
+
+- **CamFormer (L0)** reads the trajectory of the RGB camera, taken from the per-frame `camera_pose` JSON files and
+  resampled at 20 Hz (`rel9d_grav` encoding). Weights `egoexo4d_dur8.pt`, embedding of size 512.
+- **EgoVLP (L1)** reads 4 RGB frames at 224 px from the `*214-1*.mp4` stream. Weights `EgoVLP_PT_BEST`, 768-d CLS.
+
+The head is a StandardScaler plus a multinomial logistic regression with `class_weight: balanced`, on the 6 classes in
+the order Basketball, Dance, Soccer, Cooking, Health, Bike repair. Music (0 takes) and Bouldering (2 takes) are left
+out of training; the Bouldering takes still get a prediction, flagged in the `note` column.
+
+The stages are `index`, `traj`, `feat-camformer`, `feat-egovlp` and `heads`, plus two diagnostics (`check-up`,
+`check-frame`) and `select`. Each one writes a completion marker last. Rerunning a stage that is complete with the
+same config does nothing; with a different config it stops until you pass `--overwrite`. Trajectories and features do
+not depend on the split, the seeds or the check, so changing those only reruns `index` and `heads`.
+
+**Protocol.** This step uses the official split of Ego-Exo4D. We cut the official val once in half, by session and
+stratified by class, into our val (143 takes) and test (142). Every take is predicted by a head that has not seen it:
+on train, a head trained on the other folds (5 folds by session) predicts each fold, and this is repeated with 3 fold
+partitions whose probabilities are averaged; val and test get the mean of all the fold models. C is chosen by an inner
+CV grouped by session (log-loss), and a temperature is fitted on the out-of-sample logits of that same CV. Without
+`--eval-test` the test predictions are neither written nor scored; with it they go to a separate `sealed/` folder.
+
+**Pre-registered check.** After the heads, `heads` checks CamFormer (values in `check` of `configs/features.yaml`): on
+val, balanced accuracy ≥ 0.40 and the lower end of the session-bootstrap interval above chance; on the out-of-sample
+train, recall > 0 for every class; all 6 classes present in both. If the check fails, `heads` still writes its outputs
+and `check.json`, then exits with code 3, so the SLURM jobs that depend on it do not start.
+
+**Two things to keep in mind.**
+
+1. *RGB camera poses, not device poses.* CamFormer was pre-trained on the trajectory of the Aria device (x left, y up,
+   z forward, gravity along −z). The JSON files give the RGB camera in the OpenCV convention (x right, y down). We
+   pre-registered two choices for `poses.json_cam_to_device`, the identity and the paper's conversion
+   `diag(-1, -1, 1)`, and picked the identity on val (`select`, see `results/features/input_variant_selection/`).
+   `check-up` and `check-frame` are diagnostics for this frame question and were not used to decide.
+2. *CamFormer's pre-training saw most of the takes.* The encoder was pre-trained (contrastively, with the narrations,
+   without scenario labels) on the takes of the official Ego-Exo4D train. The `camformer_pretrain` column of the index
+   says, for each take, whether pre-training used it. This is why the main subset of the report, `pretrain_unseen`,
+   is the 337 takes CamFormer was not trained on.
+
+The report uses this step for the features, the labels and the `camformer_pretrain` flag. The heads are refit inside
+the nested cross-validation of step 3. The evaluation on the official split itself was our first evaluation, kept in
+`results/first_evaluation_official_split/`.
+
+**Outputs** (in `$SCENARIO_RUN_DIR`):
+
+- `predictions.csv`: train and val, one row per take, with split, folds (`fold_s*`), label and, for each model, the
+  prediction, its confidence, `conf_seed_sd` (spread across the fold partitions) and the class probabilities;
+- `sealed/predictions.csv`: the test, only after `--eval-test`;
+- `check.json` (outcome of the check) and `classes.json` (class order, excluded classes, seeds);
+- `heads/<model>/`: predictions, metrics with bootstrap intervals, and C, T and accuracy for each fold and seed;
+- `index/takes.csv` and `index/summary.json`: the index, and counts of takes and sessions by split and class;
+- `traj/status.csv` and `features/*.npz`: the outcome of each trajectory, and the embeddings per take;
+- `logs/` and `configs/`: the log and the effective config of each stage.
+
 ## Where each part of the report comes from
 
 Result files are in `results/nested_cv/report_n38_cal/` unless another folder is given.
@@ -164,7 +223,7 @@ Code paths are under `src/cascade/`.
 
 ## Development history
 
-Every decision we took along the way is written down in `docs/REGISTRO_MODIFICHE.md`. The repository used to also
+Every decision we took along the way is written down in `docs/decision_log.md`. The repository used to also
 contain our first pipeline and a first evaluation on the official split. We moved them out of the main branch in
 commit C26 without touching the code above. The tag
 [`archive/development`](https://github.com/Leonardobenedetti03/cascade-v2/tree/archive/development) points to the

@@ -2,7 +2,7 @@
 # hpc/env.sh - cluster and run settings, read by hpc/nested_cv.sh and hpc/setup_env.sh.
 # Personal values (account, paths with the user name) go in hpc/env.local.sh, which git ignores and which is
 # read first: every variable already set there keeps its value.
-# Each TODO(HPC) is filled in once, on first login. The values for the Bocconi cluster are in docs/RUNBOOK_HPC.md (N23).
+# Each TODO(HPC) is filled in once, on first login. The values for the Bocconi cluster are in docs/hpc_runbook.md (N23).
 _here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$_here/env.local.sh" ]]; then source "$_here/env.local.sh"; fi
 unset _here
