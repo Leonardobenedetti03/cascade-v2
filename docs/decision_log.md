@@ -7,7 +7,7 @@ How to read it:
 
 - **M01–M20** are the changes with respect to our plan (the "blueprint") and to our first codebase (v1), one row
   each, with the commit that brings them in.
-- **N1–N43** are working notes: choices the blueprint did not foresee, or foresaw differently, and the results we
+- **N1–N44** are working notes: choices the blueprint did not foresee, or foresaw differently, and the results we
   froze before looking at the next step.
 - **C01, C14d, ...** are commit labels. Each commit message starts with its label, so you can find it with
   `git log --grep`. We cite labels and not hashes, because labels survive a rewrite of the history.
@@ -815,3 +815,61 @@ run), checked against the PDF of the report:
 - Figure 1 is a diagram of the cascade, not a result, so it has no script.
 - No code of the pipeline changes, and no result file is rewritten: the two scripts only add files under
   `results/report/`.
+
+**N44 — Rewrite of the commit messages (27/11).** Before the submission we rewrote the messages of all the commits
+up to C30, once, with `git filter-branch --msg-filter`. The messages up to C26 were in Italian and are now in
+English, and we removed two attribution lines (`Co-Authored-By`, `Claude-Session`) from the message of C11. Nothing
+else changed: every commit keeps the same tree (the same files, byte for byte), author, committer and dates, which
+we checked commit by commit before pushing. The tag `archive/development` now points to the rewritten C25.
+
+The rewrite changes every commit hash. Some files in `results/` were written by the code and quote the hash of the
+commit that produced them, and we left them as they are: `commit=96e391e` in the log of job 772601 (C22),
+`commit=1048eae` in the logs of jobs 773281 and 773282 (C24), and `362f5e2` in `FINAL_RUNS.log` and `FINAL_DONE` of
+the first evaluation (C17). This table maps the old hashes to the new ones:
+
+| Commit | Old hash | New hash |
+|---|---|---|
+| C01 | `9c9147d` | `1bb4460` |
+| C01 | `14a0f72` | `f6b444a` |
+| C01 | `3c5c1fd` | `2dd6b8f` |
+| C01 | `b90a6a8` | `5e7f8da` |
+| C02 | `2e87fc4` | `0e83e71` |
+| C03 | `1f3b7e5` | `7a38a91` |
+| C04 | `41b0f62` | `5374c4f` |
+| C05 | `1d8dd17` | `4d4a657` |
+| C06 | `88384ba` | `69ac3b9` |
+| C07a | `fe15eb0` | `cc0df4c` |
+| C07b | `31714af` | `a6e51d9` |
+| C08a | `d134b40` | `ad3375f` |
+| C08b | `ca2154f` | `4d28f1d` |
+| C09 | `aefe79b` | `490c641` |
+| C10 | `f7e6325` | `fe1a123` |
+| C11 | `9b9b0fb` | `654f916` |
+| C12a | `d3fad63` | `cd91f71` |
+| C12b | `4d55e67` | `39dbdb6` |
+| C12c | `52546c7` | `9a7cfef` |
+| C13a | `9bbe819` | `fc3576b` |
+| C14a | `d25e685` | `2c45162` |
+| C14b-1 | `a2b4615` | `02b8fce` |
+| C14c-1 | `b93cee3` | `25e48a7` |
+| C14d | `869fe21` | `7dc50dd` |
+| C14e | `3b5f6b4` | `19d44b7` |
+| C14f | `9ab51f9` | `ab0a426` |
+| C14c-2 | `181895c` | `261c54d` |
+| C15 | `2fa1aad` | `d6cfa15` |
+| C16 | `ebbf20a` | `06e8c77` |
+| C17 | `362f5e2` | `f808f6d` |
+| C18 | `5311c3e` | `d4eb957` |
+| C19 | `2e66d57` | `c82a594` |
+| C20 | `e7d43a1` | `36f7951` |
+| C21 | `6bcffa3` | `f5d5db8` |
+| C22 | `96e391e` | `72b62da` |
+| C23 | `e0cc174` | `dcd4e94` |
+| C24 | `1048eae` | `124a4f7` |
+| C25 | `0408643` | `c770919` |
+| C26 | `3e0c5a6` | `578a8aa` |
+| C27 | `d240216` | `c935a64` |
+| C28 | `853057e` | `6cee536` |
+| C29 | `d16dc05` | `243ff94` |
+| C30 | `5df9d88` | `64736b1` |
+
